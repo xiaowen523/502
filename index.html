@@ -73,6 +73,14 @@
 <div id="cmd-bar">
     <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher)... 按 Enter 執行">
 </div>
+<!-- 手機用戶指令按鈕 -->
+<div class="container">
+    <div style="display: flex; justify: space-between; align-items: center; align-content: center; margin-bottom: 15px;">
+        <h1 style="margin: 0; flex-grow: 1; text-align: center;">🏫 5年2班</h1>
+        <!-- 📱 手機用戶專用指令按鈕 -->
+        <button id="btn-toggle-cmd" style="padding: 5px 10px; font-size: 12px; background: #6c757d;">⚡ 指令</button>
+    </div>
+</div>
 
 <!-- JavaScript 程式碼開始 -->
 <script type="module">
@@ -206,14 +214,23 @@
         }
     });
 
-    // 7. Ctrl + Alt + Z 呼叫指令列
+    // 7. Ctrl + Alt + Z 呼叫指令列 + 手機板用戶指令按鈕
+    // 切換指令列顯示/隱藏的函式
+    function toggleCmdBar() {
+        const cmdBar = document.getElementById('cmd-bar');
+        cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
+        if (cmdBar.style.display === 'block') {
+            document.getElementById('cmd-input').focus();
+        }
+    }
+
+    // 📱 手機用戶：點擊按鈕開啟/關閉指令列
+    document.getElementById('btn-toggle-cmd').addEventListener('click', toggleCmdBar);
+
+    // 💻 電腦用戶：快捷鍵 Ctrl + Alt + Z
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') {
-            const cmdBar = document.getElementById('cmd-bar');
-            cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
-            if (cmdBar.style.display === 'block') {
-                document.getElementById('cmd-input').focus();
-            }
+            toggleCmdBar();
         }
     });
 
