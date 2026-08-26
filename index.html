@@ -74,7 +74,7 @@
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="輸入指令 (例: /chat 5 查5號留言, /chat all 看全部, /admin, /teacher)...">
+    <input type="text" id="cmd-input" placeholder="輸入指令 (例: /ban 5 10, /chat 5, /admin, /teacher)...">
 </div>
 
 <script type="module">
@@ -100,6 +100,7 @@
     let currentUser = null;
     let currentRole = "student"; 
     let roleTimer = null;
+    let bannedUsers = {}; // 紀錄被禁言的座號 { seat: timestamp }
 
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
@@ -209,6 +210,12 @@
         const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "";
 
+        // 檢查是否處於禁言狀態
+        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
+            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
+            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
+        }
+
         let displayName = currentUser.displayName || "同學";
         if (currentRole === 'admin') displayName = "管理員";
         if (currentRole === 'teacher') displayName = "傳說中的光一老師";
@@ -243,7 +250,7 @@
         }
     });
 
-    // 8. 執行指令邏輯 (/chat, /admin, /teacher)
+    // 8. 執行指令邏輯 (/ban, /chat, /admin, /teacher)
     document.getElementById('cmd-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             const cmd = e.target.value.trim();
@@ -251,7 +258,6 @@
             executeCommand(cmd);
         }
     });
-    let bannedUsers = {}; // 紀錄被封鎖的座號與到期時間 { seat: expiryTimestamp }
 
     function executeCommand(cmd) {
         const parts = cmd.split(' ');
@@ -292,16 +298,10 @@
             const expireTime = Date.now() + minutes * 60 * 1000;
             bannedUsers[targetSeat] = expireTime;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
-        
         } else {
             alert("未知指令");
         }
     }
-    // 檢查是否處於禁言狀態
-        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
-            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
-            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
-        }
 
     function setTemporaryRole(role, displayName, minutes) {
         currentRole = role;
