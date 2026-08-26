@@ -10,20 +10,21 @@
         h1 { color: #1a73e8; text-align: center; }
         .form-group { margin-bottom: 15px; }
         input { padding: 8px; width: 80%; margin-top: 5px; }
-        button { padding: 10px 15px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button { padding: 10px 15px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
         button:hover { background: #1557b0; }
         #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; }
         #cmd-input { width: 90%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; }
         .hidden { display: none; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
+        .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; }
+        .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🏫 5年2班</h1>
-    <div id="status-display">目前身分：<span class="status-badge" id="role-badge">一般學生</span></div>
-
+    
     <!-- 註冊與登入區塊 -->
     <div id="auth-section">
         <h3>註冊 / 登入</h3>
@@ -31,52 +32,268 @@
             <input type="number" id="seat-num" placeholder="座號 (老師請輸入 100)">
         </div>
         <div class="form-group">
-            <input type="text" id="real-name" placeholder="真實姓名">
+            <input type="text" id="real-name" placeholder="真實姓名 (僅註冊需填)">
         </div>
         <div class="form-group">
             <input type="password" id="password" placeholder="密碼">
         </div>
         <div class="form-group">
-            <input type="password" id="confirm-password" placeholder="確認密碼 (註冊用)">
+            <input type="password" id="confirm-password" placeholder="確認密碼 (僅註冊需填)">
         </div>
-        <button onclick="register()">註冊</button>
-        <button onclick="login()">登入</button>
+        <button id="btn-register">註冊</button>
+        <button id="btn-login">登入</button>
     </div>
 
     <!-- 登入後的主畫面 -->
     <div id="main-section" class="hidden">
+        <div id="status-display" style="margin-bottom: 15px;">
+            目前身分：<span class="status-badge" id="role-badge">一般學生</span>
+            <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
+        </div>
+        
         <hr>
         <h3>💬 班級聊天室 / 發文區</h3>
-        <textarea id="post-content" rows="3" style="width: 100%;" placeholder="說點什麼..."></textarea>
-        <button onclick="submitPost()" style="margin-top: 10px;">發佈</button>
+        <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
+        <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
+        
         <div id="posts-area" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <!-- 貼文會顯示在這裡 -->
+            <!-- 聊天與發文會實時顯示在這裡 -->
         </div>
 
         <hr>
         <h3>📚 作業區</h3>
         <div id="homework-area">
             <p>目前沒有新作業。</p>
-            <!-- 只有老師可以看見上傳按鈕 -->
-            <button id="upload-hw-btn" class="hidden" onclick="uploadHomework()">上傳新作業</button>
+            <button id="upload-hw-btn" class="hidden">上傳新作業</button>
         </div>
     </div>
 </div>
 
-<!-- 隱藏的指令列 -->
+<!-- 隱藏指令列 -->
 <div id="cmd-bar">
     <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher, /stop 座號 分鐘數)... 按 Enter 執行">
 </div>
 
-<script>
-    // 使用者狀態變數
+<!-- 引入 Firebase SDK (使用 Module 模組方式) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 🔴【重點】請把下面這段替換成你在 Firebase 複製的金鑰！
+    const firebaseConfig = {
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5年2班 專屬班網</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        input { padding: 8px; width: 80%; margin-top: 5px; }
+        button { padding: 10px 15px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
+        button:hover { background: #1557b0; }
+        #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; }
+        #cmd-input { width: 90%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; }
+        .hidden { display: none; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
+        .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; }
+        .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏫 5年2班</h1>
+    
+    <!-- 註冊與登入區塊 -->
+    <div id="auth-section">
+        <h3>註冊 / 登入</h3>
+        <div class="form-group">
+            <input type="number" id="seat-num" placeholder="座號 (老師請輸入 100)">
+        </div>
+        <div class="form-group">
+            <input type="text" id="real-name" placeholder="真實姓名 (僅註冊需填)">
+        </div>
+        <div class="form-group">
+            <input type="password" id="password" placeholder="密碼">
+        </div>
+        <div class="form-group">
+            <input type="password" id="confirm-password" placeholder="確認密碼 (僅註冊需填)">
+        </div>
+        <button id="btn-register">註冊</button>
+        <button id="btn-login">登入</button>
+    </div>
+
+    <!-- 登入後的主畫面 -->
+    <div id="main-section" class="hidden">
+        <div id="status-display" style="margin-bottom: 15px;">
+            目前身分：<span class="status-badge" id="role-badge">一般學生</span>
+            <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
+        </div>
+        
+        <hr>
+        <h3>💬 班級聊天室 / 發文區</h3>
+        <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
+        <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
+        
+        <div id="posts-area" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
+            <!-- 聊天與發文會實時顯示在這裡 -->
+        </div>
+
+        <hr>
+        <h3>📚 作業區</h3>
+        <div id="homework-area">
+            <p>目前沒有新作業。</p>
+            <button id="upload-hw-btn" class="hidden">上傳新作業</button>
+        </div>
+    </div>
+</div>
+
+<!-- 隱藏指令列 -->
+<div id="cmd-bar">
+    <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher, /stop 座號 分鐘數)... 按 Enter 執行">
+</div>
+
+<!-- 引入 Firebase SDK (使用 Module 模組方式) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 🔴【重點】請把下面這段替換成你在 Firebase 複製的金鑰！
+    const firebaseConfig = {
+        apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+        authDomain: "class-6fbf4.firebaseapp.com",
+        projectId: "class-6fbf4"",
+        storageBucket: "class-6fbf4.firebasestorage.app",
+        messagingSenderId: "863989862320",
+        appId: "G-NDMQVP76PH"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
     let currentUser = null;
-    let currentRole = "student"; // student, admin, teacher
+    let currentRole = "student"; 
     let roleTimer = null;
 
-    // 1. 快捷鍵 Ctrl + Alt + Z 開啟指令列
-    document.addEventListener('keydown', function(event) {
-        if (event.ctrlKey && event.altKey && event.key.toLowerCase() === 'z') {
+    // 將座號轉換成安全的 Email 格式以供 Firebase 驗證使用
+    function formatEmail(seat) {
+        return `student_seat_${seat}@class52.com`;
+    }
+
+    // 1. 註冊功能
+    document.getElementById('btn-register').addEventListener('click', async () => {
+        const seat = document.getElementById('seat-num').value.trim();
+        const name = document.getElementById('real-name').value.trim();
+        const pwd = document.getElementById('password').value;
+        const confirmPwd = document.getElementById('confirm-password').value;
+
+        if (!seat || !name || !pwd) return alert("請填寫座號、真實姓名與密碼！");
+        if (pwd !== confirmPwd) return alert("兩次輸入的密碼不一致！");
+
+        const email = formatEmail(seat);
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, pwd);
+            // 將同學真實姓名寫入 Firebase 使用者暱稱中
+            await updateProfile(userCredential.user, { displayName: name });
+            alert("註冊成功！已自動登入");
+        } catch (error) {
+            alert("註冊失敗：" + error.message);
+        }
+    });
+
+    // 2. 登入功能
+    document.getElementById('btn-login').addEventListener('click', async () => {
+        const seat = document.getElementById('seat-num').value.trim();
+        const pwd = document.getElementById('password').value;
+
+        if (!seat || !pwd) return alert("請輸入座號與密碼！");
+
+        const email = formatEmail(seat);
+
+        try {
+            await signInWithEmailAndPassword(auth, email, pwd);
+            alert("登入成功！");
+        } catch (error) {
+            alert("登入失敗：座號或密碼錯誤！");
+        }
+    });
+
+    // 3. 登出功能
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        signOut(auth);
+    });
+
+    // 4. 監聽登入狀態改變
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('main-section').classList.remove('hidden');
+            loadPosts(); // 載入即時訊息
+        } else {
+            currentUser = null;
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('main-section').classList.add('hidden');
+        }
+    });
+
+    // 5. 即時讀取 Firebase 聊天紀錄
+    function loadPosts() {
+        const postsRef = collection(db, "posts");
+        const q = query(postsRef, orderBy("timestamp", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            const postsArea = document.getElementById('posts-area');
+            postsArea.innerHTML = ''; // 清空重新渲染
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+                
+                const postDiv = document.createElement('div');
+                postDiv.className = 'post';
+                postDiv.innerHTML = `
+                    <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                    <div style="margin-top: 5px;">${data.content}</div>
+                `;
+                postsArea.appendChild(postDiv);
+            });
+        });
+    }
+
+    // 6. 發佈貼文到 Firebase
+    document.getElementById('btn-submit-post').addEventListener('click', async () => {
+        const content = document.getElementById('post-content').value.trim();
+        if (!content) return alert("內容不能為空！");
+
+        let displayName = currentUser.displayName || "同學";
+        if (currentRole === 'admin') displayName = "管理員";
+        if (currentRole === 'teacher') displayName = "傳說中的光影老師";
+
+        try {
+            await addDoc(collection(db, "posts"), {
+                senderName: displayName,
+                content: content,
+                timestamp: serverTimestamp()
+            });
+            document.getElementById('post-content').value = '';
+        } catch (error) {
+            alert("發佈失敗：" + error.message);
+        }
+    });
+
+    // 7. Ctrl + Alt + Z 呼叫指令列
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') {
             const cmdBar = document.getElementById('cmd-bar');
             cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
             if (cmdBar.style.display === 'block') {
@@ -85,11 +302,11 @@
         }
     });
 
-    // 2. 處理指令輸入
-    document.getElementById('cmd-input').addEventListener('keypress', function(event) {
-        if (event.key === 'Enter') {
-            const cmd = this.value.trim();
-            this.value = ''; // 清空輸入框
+    // 8. 執行指令邏輯 (/admin, /teacher, /stop)
+    document.getElementById('cmd-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const cmd = e.target.value.trim();
+            e.target.value = '';
             executeCommand(cmd);
         }
     });
@@ -107,74 +324,223 @@
                 const targetSeat = parts[1];
                 const minutes = parts[2];
                 if (targetSeat && minutes) {
-                    alert(`已將座號 ${targetSeat} 停權 ${minutes} 分鐘！`);
-                    // 這裡未來需要連線到資料庫執行停權邏輯
+                    alert(`已停權座號 ${targetSeat} 號 ${minutes} 分鐘`);
                 } else {
-                    alert('指令格式錯誤：/stop [座號] [分鐘數]');
+                    alert("格式錯誤！使用方式：/stop 座號 分鐘數");
                 }
             } else {
-                alert('權限不足！只有管理員或老師可以使用此指令。');
+                alert("權限不足！");
             }
         } else {
-            alert('未知指令！');
+            alert("未知指令");
         }
     }
 
-    // 3. 設定暫時權限 (10分鐘後恢復)
     function setTemporaryRole(role, displayName, minutes) {
         currentRole = role;
-        document.getElementById('role-badge').innerText = displayName;
-        document.getElementById('role-badge').style.background = (role === 'admin') ? '#d93025' : '#188038';
-        
-        // 顯示老師專用的作業上傳按鈕
+        const badge = document.getElementById('role-badge');
+        badge.innerText = displayName;
+        badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
+
         document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher');
 
-        alert(`已切換至 ${displayName} 模式，時效 ${minutes} 分鐘。`);
+        alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
 
-        // 清除舊計時器並設定新的 (10分鐘 = 600000毫秒)
         if (roleTimer) clearTimeout(roleTimer);
         roleTimer = setTimeout(() => {
             currentRole = 'student';
-            document.getElementById('role-badge').innerText = '一般學生';
-            document.getElementById('role-badge').style.background = '#888';
+            badge.innerText = '一般學生';
+            badge.style.background = '#888';
             document.getElementById('upload-hw-btn').classList.add('hidden');
             alert('特殊權限時間已到，恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
+</script>
 
-    // 4. 模擬註冊與登入
-    function login() {
-        const name = document.getElementById('real-name').value;
-        const seat = document.getElementById('seat-num').value;
-        if (!name || !seat) return alert("請輸入座號和姓名！");
-        
-        currentUser = { name: name, seat: seat };
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('main-section').classList.remove('hidden');
-        alert("登入成功！歡迎來到5年2班班網！");
+</body>
+</html>
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let currentRole = "student"; 
+    let roleTimer = null;
+
+    // 將座號轉換成安全的 Email 格式以供 Firebase 驗證使用
+    function formatEmail(seat) {
+        return `student_seat_${seat}@class52.com`;
     }
 
-    // 5. 模擬發文功能
-    function submitPost() {
-        const content = document.getElementById('post-content').value;
-        if (!content) return;
+    // 1. 註冊功能
+    document.getElementById('btn-register').addEventListener('click', async () => {
+        const seat = document.getElementById('seat-num').value.trim();
+        const name = document.getElementById('real-name').value.trim();
+        const pwd = document.getElementById('password').value;
+        const confirmPwd = document.getElementById('confirm-password').value;
 
-        let displayName = currentUser.name;
+        if (!seat || !name || !pwd) return alert("請填寫座號、真實姓名與密碼！");
+        if (pwd !== confirmPwd) return alert("兩次輸入的密碼不一致！");
+
+        const email = formatEmail(seat);
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, pwd);
+            // 將同學真實姓名寫入 Firebase 使用者暱稱中
+            await updateProfile(userCredential.user, { displayName: name });
+            alert("註冊成功！已自動登入");
+        } catch (error) {
+            alert("註冊失敗：" + error.message);
+        }
+    });
+
+    // 2. 登入功能
+    document.getElementById('btn-login').addEventListener('click', async () => {
+        const seat = document.getElementById('seat-num').value.trim();
+        const pwd = document.getElementById('password').value;
+
+        if (!seat || !pwd) return alert("請輸入座號與密碼！");
+
+        const email = formatEmail(seat);
+
+        try {
+            await signInWithEmailAndPassword(auth, email, pwd);
+            alert("登入成功！");
+        } catch (error) {
+            alert("登入失敗：座號或密碼錯誤！");
+        }
+    });
+
+    // 3. 登出功能
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        signOut(auth);
+    });
+
+    // 4. 監聽登入狀態改變
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('main-section').classList.remove('hidden');
+            loadPosts(); // 載入即時訊息
+        } else {
+            currentUser = null;
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('main-section').classList.add('hidden');
+        }
+    });
+
+    // 5. 即時讀取 Firebase 聊天紀錄
+    function loadPosts() {
+        const postsRef = collection(db, "posts");
+        const q = query(postsRef, orderBy("timestamp", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            const postsArea = document.getElementById('posts-area');
+            postsArea.innerHTML = ''; // 清空重新渲染
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+                
+                const postDiv = document.createElement('div');
+                postDiv.className = 'post';
+                postDiv.innerHTML = `
+                    <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                    <div style="margin-top: 5px;">${data.content}</div>
+                `;
+                postsArea.appendChild(postDiv);
+            });
+        });
+    }
+
+    // 6. 發佈貼文到 Firebase
+    document.getElementById('btn-submit-post').addEventListener('click', async () => {
+        const content = document.getElementById('post-content').value.trim();
+        if (!content) return alert("內容不能為空！");
+
+        let displayName = currentUser.displayName || "同學";
         if (currentRole === 'admin') displayName = "管理員";
         if (currentRole === 'teacher') displayName = "傳說中的光影老師";
 
-        const postHtml = `
-            <div style="background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
-                <strong>${displayName}</strong> 說：<br>
-                ${content}
-            </div>
-        `;
-        document.getElementById('posts-area').innerHTML = postHtml + document.getElementById('posts-area').innerHTML;
-        document.getElementById('post-content').value = '';
+        try {
+            await addDoc(collection(db, "posts"), {
+                senderName: displayName,
+                content: content,
+                timestamp: serverTimestamp()
+            });
+            document.getElementById('post-content').value = '';
+        } catch (error) {
+            alert("發佈失敗：" + error.message);
+        }
+    });
+
+    // 7. Ctrl + Alt + Z 呼叫指令列
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') {
+            const cmdBar = document.getElementById('cmd-bar');
+            cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
+            if (cmdBar.style.display === 'block') {
+                document.getElementById('cmd-input').focus();
+            }
+        }
+    });
+
+    // 8. 執行指令邏輯 (/admin, /teacher, /stop)
+    document.getElementById('cmd-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const cmd = e.target.value.trim();
+            e.target.value = '';
+            executeCommand(cmd);
+        }
+    });
+
+    function executeCommand(cmd) {
+        const parts = cmd.split(' ');
+        const action = parts[0];
+
+        if (action === '/admin') {
+            setTemporaryRole('admin', '管理員', 10);
+        } else if (action === '/teacher') {
+            setTemporaryRole('teacher', '傳說中的光影老師', 10);
+        } else if (action === '/stop') {
+            if (currentRole === 'admin' || currentRole === 'teacher') {
+                const targetSeat = parts[1];
+                const minutes = parts[2];
+                if (targetSeat && minutes) {
+                    alert(`已停權座號 ${targetSeat} 號 ${minutes} 分鐘`);
+                } else {
+                    alert("格式錯誤！使用方式：/stop 座號 分鐘數");
+                }
+            } else {
+                alert("權限不足！");
+            }
+        } else {
+            alert("未知指令");
+        }
     }
 
-    function uploadHomework() {
-        alert("開啟作業上傳視窗... (需串接後端功能)");
+    function setTemporaryRole(role, displayName, minutes) {
+        currentRole = role;
+        const badge = document.getElementById('role-badge');
+        badge.innerText = displayName;
+        badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
+
+        document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher');
+
+        alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
+
+        if (roleTimer) clearTimeout(roleTimer);
+        roleTimer = setTimeout(() => {
+            currentRole = 'student';
+            badge.innerText = '一般學生';
+            badge.style.background = '#888';
+            document.getElementById('upload-hw-btn').classList.add('hidden');
+            alert('特殊權限時間已到，恢復為一般學生狀態。');
+        }, minutes * 60 * 1000);
     }
 </script>
 
