@@ -71,7 +71,7 @@
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher, /stop 座號 分鐘數)... 按 Enter 執行">
+    <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher)... 按 Enter 執行">
 </div>
 
 <!-- JavaScript 程式碼開始 -->
@@ -192,7 +192,7 @@
 
         let displayName = currentUser.displayName || "同學";
         if (currentRole === 'admin') displayName = "管理員";
-        if (currentRole === 'teacher') displayName = "傳說中的光影老師";
+        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
 
         try {
             await addDoc(collection(db, "posts"), {
@@ -233,17 +233,10 @@
         if (action === '/admin') {
             setTemporaryRole('admin', '管理員', 10);
         } else if (action === '/teacher') {
-            setTemporaryRole('teacher', '傳說中的光影老師', 10);
-        } else if (action === '/stop') {
-            if (currentRole === 'admin' || currentRole === 'teacher') {
-                const targetSeat = parts[1];
-                const minutes = parts[2];
-                if (targetSeat && minutes) {
-                    alert(`已停權座號 ${targetSeat} 號 ${minutes} 分鐘`);
-                } else {
-                    alert("格式錯誤！使用方式：/stop 座號 分鐘數");
-                }
-            } else {
+            setTemporaryRole('teacher', '傳說中的光一老師', 10);
+        
+                
+        } else {
                 alert("權限不足！");
             }
         } else {
