@@ -57,7 +57,7 @@
         <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
         
         <div id="posts-area" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <!-- 聊天與發文會實時顯示在這裡 -->
+            <!-- 聊天與發文會顯示在這裡 -->
         </div>
 
         <hr>
@@ -74,104 +74,21 @@
     <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher, /stop 座號 分鐘數)... 按 Enter 執行">
 </div>
 
-<!-- 引入 Firebase SDK (使用 Module 模組方式) -->
+<!-- JavaScript 程式碼開始 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔴【重點】請把下面這段替換成你在 Firebase 複製的金鑰！
+    // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
     const firebaseConfig = {
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>5年2班 專屬班網</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h1 { color: #1a73e8; text-align: center; }
-        .form-group { margin-bottom: 15px; }
-        input { padding: 8px; width: 80%; margin-top: 5px; }
-        button { padding: 10px 15px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
-        button:hover { background: #1557b0; }
-        #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; }
-        #cmd-input { width: 90%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; }
-        .hidden { display: none; }
-        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
-        .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; }
-        .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>🏫 5年2班</h1>
-    
-    <!-- 註冊與登入區塊 -->
-    <div id="auth-section">
-        <h3>註冊 / 登入</h3>
-        <div class="form-group">
-            <input type="number" id="seat-num" placeholder="座號 (老師請輸入 100)">
-        </div>
-        <div class="form-group">
-            <input type="text" id="real-name" placeholder="真實姓名 (僅註冊需填)">
-        </div>
-        <div class="form-group">
-            <input type="password" id="password" placeholder="密碼">
-        </div>
-        <div class="form-group">
-            <input type="password" id="confirm-password" placeholder="確認密碼 (僅註冊需填)">
-        </div>
-        <button id="btn-register">註冊</button>
-        <button id="btn-login">登入</button>
-    </div>
-
-    <!-- 登入後的主畫面 -->
-    <div id="main-section" class="hidden">
-        <div id="status-display" style="margin-bottom: 15px;">
-            目前身分：<span class="status-badge" id="role-badge">一般學生</span>
-            <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
-        </div>
-        
-        <hr>
-        <h3>💬 班級聊天室 / 發文區</h3>
-        <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
-        <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
-        
-        <div id="posts-area" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <!-- 聊天與發文會實時顯示在這裡 -->
-        </div>
-
-        <hr>
-        <h3>📚 作業區</h3>
-        <div id="homework-area">
-            <p>目前沒有新作業。</p>
-            <button id="upload-hw-btn" class="hidden">上傳新作業</button>
-        </div>
-    </div>
-</div>
-
-<!-- 隱藏指令列 -->
-<div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="輸入指令 (例如: /admin, /teacher, /stop 座號 分鐘數)... 按 Enter 執行">
-</div>
-
-<!-- 引入 Firebase SDK (使用 Module 模組方式) -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // 🔴【重點】請把下面這段替換成你在 Firebase 複製的金鑰！
-    const firebaseConfig = {
-        apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-        authDomain: "class-6fbf4.firebaseapp.com",
-        projectId: "class-6fbf4"",
-        storageBucket: "class-6fbf4.firebasestorage.app",
-        messagingSenderId: "863989862320",
-        appId: "G-NDMQVP76PH"
+      apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+      authDomain: "class-6fbf4.firebaseapp.com",
+      projectId: "class-6fbf4",
+      storageBucket: "class-6fbf4.firebasestorage.app",
+      messagingSenderId: "863989862320",
+      appId: "1:863989862320:web:87da48fd3d835a7775d075",
+      measurementId: "G-NDMQVP76PH"
     };
 
     // 初始化 Firebase
@@ -183,7 +100,6 @@
     let currentRole = "student"; 
     let roleTimer = null;
 
-    // 將座號轉換成安全的 Email 格式以供 Firebase 驗證使用
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
     }
@@ -202,7 +118,6 @@
 
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, pwd);
-            // 將同學真實姓名寫入 Firebase 使用者暱稱中
             await updateProfile(userCredential.user, { displayName: name });
             alert("註冊成功！已自動登入");
         } catch (error) {
@@ -238,7 +153,7 @@
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
-            loadPosts(); // 載入即時訊息
+            loadPosts(); 
         } else {
             currentUser = null;
             document.getElementById('auth-section').classList.remove('hidden');
@@ -253,7 +168,7 @@
 
         onSnapshot(q, (snapshot) => {
             const postsArea = document.getElementById('posts-area');
-            postsArea.innerHTML = ''; // 清空重新渲染
+            postsArea.innerHTML = ''; 
             
             snapshot.forEach((doc) => {
                 const data = doc.data();
