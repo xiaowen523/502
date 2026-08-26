@@ -248,9 +248,19 @@
         const action = parts[0];
 
         if (action === '/admin') {
-            setTemporaryRole('admin', '管理員', 10);
+            const pwd = prompt("請輸入管理員密碼：");
+            if (pwd === "admin123") { // 👈 在這裡修改管理員密碼
+                setTemporaryRole('admin', '管理員', 10);
+            } else if (pwd !== null) {
+                alert("密碼錯誤！權限驗證失敗。");
+            }
         } else if (action === '/teacher') {
-            setTemporaryRole('teacher', '傳說中的光一老師', 10);
+            const pwd = prompt("請輸入光一老師認證密碼：");
+            if (pwd === "teacher888") { // 👈 在這裡修改老師密碼
+                setTemporaryRole('teacher', '傳說中的光一老師', 10);
+            } else if (pwd !== null) {
+                alert("密碼錯誤！權限驗證失敗。");
+            }
         } else {
             alert("未知指令");
         }
