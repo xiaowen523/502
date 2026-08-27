@@ -81,7 +81,34 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    //私訊功能
+    async function sendPrivateMessage(targetSeat, content) {
+        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const userSeat = seatMatch ? seatMatch[1] : "";
 
+        // 檢查是否處於禁言狀態
+        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
+            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
+            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
+        }
+
+        let displayName = currentUser.displayName || "同學";
+        if (currentRole === 'admin') displayName = "管理員";
+        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
+
+        try {
+            await addDoc(collection(db, "posts"), {
+                senderName: displayName,
+                seatNumber: userSeat,
+                receiverSeat: String(targetSeat), // 🔒 註記私訊對象座號
+                content: content,
+                timestamp: serverTimestamp()
+            });
+            alert(`已成功發送私訊給 【${targetSeat}】 號同學！`);
+        } catch (error) {
+            alert("私訊發送失敗：" + error.message);
+        }
+    }
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
     const firebaseConfig = {
       apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
@@ -298,6 +325,16 @@
             const expireTime = Date.now() + minutes * 60 * 1000;
             bannedUsers[targetSeat] = expireTime;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
+        } else if (action === '/msg') {
+            const targetSeat = parts[1];
+            const msgContent = parts.slice(2).join(' ').trim(); // 組合座號後方的所有文字
+
+            if (!targetSeat || !msgContent) {
+                return alert("格式錯誤！使用方式：/msg 座號 訊息內容 (例: /msg 5 明天作業是什麼？)");
+            }
+
+            sendPrivateMessage(targetSeat, msgContent);
+        
         } else {
             alert("未知指令");
         }
