@@ -17,6 +17,7 @@
         .hidden { display: none; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
         .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; }
+        .hw-card { background: #e8f0fe; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #34a853; }
         .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
     </style>
 </head>
@@ -55,26 +56,33 @@
         </div>
         
         <hr>
+        <!-- 1. 發文區 -->
         <h3>💬 班級聊天室 / 發文區</h3>
         <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
         <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
-        
-        <div id="posts-area" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <!-- 聊天與發文會顯示在這裡 -->
+
+        <hr>
+        <!-- 2. 作業區 (移至發布區正下方) -->
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">📚 最新作業區</h3>
+            <button id="upload-hw-btn" class="hidden" style="background: #28a745; font-size: 13px;">➕ 上傳新作業</button>
+        </div>
+        <div id="homework-area" style="margin-top: 10px;">
+            <p style="color: #666; font-style: italic;">載入作業中...</p>
         </div>
 
         <hr>
-        <h3>📚 作業區</h3>
-        <div id="homework-area">
-            <p>目前沒有新作業。</p>
-            <button id="upload-hw-btn" class="hidden">上傳新作業</button>
+        <!-- 3. 聊天與發文歷史紀錄區 -->
+        <h3>💬 留言對話紀錄</h3>
+        <div id="posts-area" style="margin-top: 10px;">
+            <!-- 聊天與發文會顯示在這裡 -->
         </div>
     </div>
 </div>
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="輸入指令 (例: /ban 5 10, /chat 5, /admin, /teacher)...">
+    <input type="text" id="cmd-input" placeholder="指令例: /msg 5 哈囉, /ban 5 10, /chat 5, /admin, /teacher...">
 </div>
 
 <script type="module">
@@ -83,14 +91,14 @@
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
-    const firebaseConfig = {   
-        apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-        authDomain: "class-6fbf4.firebaseapp.com",
-        projectId: "class-6fbf4",
-        storageBucket: "class-6fbf4.firebasestorage.app",
-        messagingSenderId: "863989862320",
-        appId: "1:863989862320:web:87da48fd3d835a7775d075",
-         measurementId: "G-NDMQVP76PH"
+    const firebaseConfig = {
+          apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+          authDomain: "class-6fbf4.firebaseapp.com",
+          projectId: "class-6fbf4",
+          storageBucket: "class-6fbf4.firebasestorage.app",
+          messagingSenderId: "863989862320",
+          appId: "1:863989862320:web:87da48fd3d835a7775d075",
+          measurementId: "G-NDMQVP76PH"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -155,7 +163,15 @@
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
+
+            // 判斷是否為 100 號 (老師帳號) 自動賦予老師權限
+            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+            if (seatMatch && seatMatch[1] === "100") {
+                setTemporaryRole('teacher', '傳說中的光一老師', 1440); // 預設 24 小時
+            }
+
             loadPosts(); 
+            loadHomeworks();
         } else {
             currentUser = null;
             document.getElementById('auth-section').classList.remove('hidden');
@@ -163,7 +179,7 @@
         }
     });
 
-    // 5. 即時讀取與過濾聊天紀錄
+    // 5. 即時載入與過濾聊天紀錄
     function loadPosts() {
         filterPostsBySeat('all');
     }
@@ -232,7 +248,61 @@
         });
     }
 
-    // 6. 發佈公開貼文到 Firebase
+    // 6. 即時載入作業列表
+    function loadHomeworks() {
+        const hwRef = collection(db, "homeworks");
+        const q = query(hwRef, orderBy("timestamp", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            const hwArea = document.getElementById('homework-area');
+            hwArea.innerHTML = '';
+
+            if (snapshot.empty) {
+                hwArea.innerHTML = '<p style="color: #777;">目前沒有新作業！🎉</p>';
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+
+                const hwDiv = document.createElement('div');
+                hwDiv.className = 'hw-card';
+                hwDiv.innerHTML = `
+                    <strong>📌 ${data.title}</strong> <span class="post-time">${timeStr}</span><br>
+                    <div style="margin-top: 5px;">${data.content}</div>
+                `;
+                hwArea.appendChild(hwDiv);
+            });
+        });
+    }
+
+    // 7. 老師上傳新作業功能
+    document.getElementById('upload-hw-btn').addEventListener('click', async () => {
+        if (currentRole !== 'teacher' && currentRole !== 'admin') {
+            return alert("只有老師可以發佈作業！");
+        }
+
+        const title = prompt("請輸入作業科目/名稱：", "國語第十課單字");
+        if (!title) return;
+
+        const content = prompt("請輸入作業詳細說明或要求：");
+        if (!content) return;
+
+        try {
+            await addDoc(collection(db, "homeworks"), {
+                title: title,
+                content: content,
+                author: "光一老師",
+                timestamp: serverTimestamp()
+            });
+            alert("作業發佈成功！");
+        } catch (error) {
+            alert("發佈作業失敗：" + error.message);
+        }
+    });
+
+    // 8. 發佈公開貼文到 Firebase
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const content = document.getElementById('post-content').value.trim();
         if (!content) return alert("內容不能為空！");
@@ -290,7 +360,7 @@
         }
     }
 
-    // 7. 切換指令列
+    // 9. 切換指令列
     function toggleCmdBar() {
         const cmdBar = document.getElementById('cmd-bar');
         cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
@@ -307,7 +377,7 @@
         }
     });
 
-    // 8. 執行指令邏輯
+    // 10. 執行指令邏輯
     document.getElementById('cmd-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             const cmd = e.target.value.trim();
@@ -375,7 +445,8 @@
         badge.innerText = displayName;
         badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
 
-        document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher');
+        // 控制發佈作業按鈕顯示/隱藏
+        document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
 
         alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
 
