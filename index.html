@@ -78,84 +78,19 @@
 </div>
 
 <script type="module">
+    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    //私訊功能
-    function filterPostsBySeat(seat) {
-        const postsRef = collection(db, "posts");
-        const q = query(postsRef, orderBy("timestamp", "desc"));
 
-        // 精準抓取目前登入者的座號 (轉為字串避免型態不合)
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
-        const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
-
-        onSnapshot(q, (snapshot) => {
-            const postsArea = document.getElementById('posts-area');
-            postsArea.innerHTML = ''; 
-            
-            let count = 0;
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                
-                // 🔒 私訊嚴格過濾邏輯
-                if (data.receiverSeat) {
-                    const senderSeat = String(data.seatNumber);
-                    const receiverSeat = String(data.receiverSeat);
-
-                    const isSender = (currentUserSeat && senderSeat === currentUserSeat);
-                    const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
-                    const isAdmin = (currentRole === 'admin'); // 僅管理員可監督
-
-                    // 如果既不是發送者、也不是接收者、更不是管理員 -> 絕對隱藏！
-                    if (!isSender && !isReceiver && !isAdmin) {
-                        return; // 垂直跳過不渲染
-                    }
-                }
-
-                // 特定座號過濾 (指令 /chat 座號)
-                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
-                    return;
-                }
-
-                count++;
-                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
-                
-                const postDiv = document.createElement('div');
-                postDiv.className = 'post';
-
-                // 私訊卡片外觀
-                if (data.receiverSeat) {
-                    postDiv.style.background = '#fff3cd';
-                    postDiv.style.borderLeft = '4px solid #ffc107';
-                    postDiv.innerHTML = `
-                        <strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
-                        <div style="margin-top: 5px; color: #856404;">${data.content}</div>
-                    `;
-                } else {
-                    postDiv.innerHTML = `
-                        <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
-                        <div style="margin-top: 5px;">${data.content}</div>
-                    `;
-                }
-
-                postsArea.appendChild(postDiv);
-            });
-
-            if (seat !== 'all') {
-                alert(`已篩選座號 【${seat}】 的留言，共找到 ${count} 則記錄。（輸入 /chat all 可看全部）`);
-            }
-        });
-    }
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
     const firebaseConfig = {
-      apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-      authDomain: "class-6fbf4.firebaseapp.com",
-      projectId: "class-6fbf4",
-      storageBucket: "class-6fbf4.firebasestorage.app",
-      messagingSenderId: "863989862320",
-      appId: "1:863989862320:web:87da48fd3d835a7775d075",
-      measurementId: "G-NDMQVP76PH"
+        apiKey: "你的_API_KEY",
+        authDomain: "你的_PROJECT_ID.firebaseapp.com",
+        projectId: "你的_PROJECT_ID",
+        storageBucket: "你的_PROJECT_ID.appspot.com",
+        messagingSenderId: "你的_SENDER_ID",
+        appId: "你的_APP_ID"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -165,7 +100,7 @@
     let currentUser = null;
     let currentRole = "student"; 
     let roleTimer = null;
-    let bannedUsers = {}; // 紀錄被禁言的座號 { seat: timestamp }
+    let bannedUsers = {}; 
 
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
@@ -237,6 +172,9 @@
         const postsRef = collection(db, "posts");
         const q = query(postsRef, orderBy("timestamp", "desc"));
 
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
+
         onSnapshot(q, (snapshot) => {
             const postsArea = document.getElementById('posts-area');
             postsArea.innerHTML = ''; 
@@ -245,7 +183,22 @@
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 
-                if (seat !== 'all' && data.seatNumber !== String(seat)) {
+                // 🔒 私訊過濾：只有發送者、接收者與管理員看得見
+                if (data.receiverSeat) {
+                    const senderSeat = String(data.seatNumber);
+                    const receiverSeat = String(data.receiverSeat);
+
+                    const isSender = (currentUserSeat && senderSeat === currentUserSeat);
+                    const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
+                    const isAdmin = (currentRole === 'admin');
+
+                    if (!isSender && !isReceiver && !isAdmin) {
+                        return; // 第三人絕對跳過
+                    }
+                }
+
+                // 特定座號過濾 (指令 /chat 座號)
+                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
                     return;
                 }
 
@@ -254,10 +207,22 @@
                 
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
-                postDiv.innerHTML = `
-                    <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
-                    <div style="margin-top: 5px;">${data.content}</div>
-                `;
+
+                // 私訊卡片外觀
+                if (data.receiverSeat) {
+                    postDiv.style.background = '#fff3cd';
+                    postDiv.style.borderLeft = '4px solid #ffc107';
+                    postDiv.innerHTML = `
+                        <strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px; color: #856404;">${data.content}</div>
+                    `;
+                } else {
+                    postDiv.innerHTML = `
+                        <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px;">${data.content}</div>
+                    `;
+                }
+
                 postsArea.appendChild(postDiv);
             });
 
@@ -267,7 +232,7 @@
         });
     }
 
-    // 6. 發佈貼文到 Firebase
+    // 6. 發佈公開貼文到 Firebase
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const content = document.getElementById('post-content').value.trim();
         if (!content) return alert("內容不能為空！");
@@ -275,7 +240,6 @@
         const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "";
 
-        // 檢查是否處於禁言狀態
         if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
             const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
             return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
@@ -298,6 +262,34 @@
         }
     });
 
+    // 發送私訊函式
+    async function sendPrivateMessage(targetSeat, content) {
+        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const userSeat = seatMatch ? seatMatch[1] : "";
+
+        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
+            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
+            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
+        }
+
+        let displayName = currentUser.displayName || "同學";
+        if (currentRole === 'admin') displayName = "管理員";
+        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
+
+        try {
+            await addDoc(collection(db, "posts"), {
+                senderName: displayName,
+                seatNumber: userSeat,
+                receiverSeat: String(targetSeat),
+                content: content,
+                timestamp: serverTimestamp()
+            });
+            alert(`已成功發送私訊給 【${targetSeat}】 號同學！`);
+        } catch (error) {
+            alert("私訊發送失敗：" + error.message);
+        }
+    }
+
     // 7. 切換指令列
     function toggleCmdBar() {
         const cmdBar = document.getElementById('cmd-bar');
@@ -315,7 +307,7 @@
         }
     });
 
-    // 8. 執行指令邏輯 (/ban, /chat, /admin, /teacher)
+    // 8. 執行指令邏輯
     document.getElementById('cmd-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             const cmd = e.target.value.trim();
@@ -342,6 +334,15 @@
             } else if (pwd !== null) {
                 alert("密碼錯誤！權限驗證失敗。");
             }
+        } else if (action === '/msg') {
+            const targetSeat = parts[1];
+            const msgContent = parts.slice(2).join(' ').trim();
+
+            if (!targetSeat || !msgContent) {
+                return alert("格式錯誤！使用方式：/msg 座號 訊息內容 (例: /msg 5 明天要帶什麼？)");
+            }
+
+            sendPrivateMessage(targetSeat, msgContent);
         } else if (action === '/chat') {
             const targetSeat = parts[1];
             if (!targetSeat) {
@@ -363,16 +364,6 @@
             const expireTime = Date.now() + minutes * 60 * 1000;
             bannedUsers[targetSeat] = expireTime;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
-        } else if (action === '/msg') {
-            const targetSeat = parts[1];
-            const msgContent = parts.slice(2).join(' ').trim(); // 組合座號後方的所有文字
-
-            if (!targetSeat || !msgContent) {
-                return alert("格式錯誤！使用方式：/msg 座號 訊息內容 (例: /msg 5 明天作業是什麼？)");
-            }
-
-            sendPrivateMessage(targetSeat, msgContent);
-        
         } else {
             alert("未知指令");
         }
@@ -397,6 +388,7 @@
             alert('特殊權限時間已到，恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
+</script>
 </script>
 
 </body>
