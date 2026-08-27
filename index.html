@@ -78,7 +78,6 @@
 </div>
 
 <script type="module">
-    <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -388,7 +387,6 @@
             alert('特殊權限時間已到，恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
-</script>
 </script>
 
 </body>
