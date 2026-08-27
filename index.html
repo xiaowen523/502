@@ -196,10 +196,11 @@
             postsArea.innerHTML = ''; 
             
             let count = 0;
-            snapshot.forEach((doc) => {
-                const data = doc.data();
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const docId = docSnap.id; // 取得該筆貼文的 Firebase ID
                 
-                // 🔒 私訊過濾：只有發送者、接收者與管理員看得見
+                // 🔒 私訊過濾
                 if (data.receiverSeat) {
                     const senderSeat = String(data.seatNumber);
                     const receiverSeat = String(data.receiverSeat);
@@ -209,11 +210,10 @@
                     const isAdmin = (currentRole === 'admin');
 
                     if (!isSender && !isReceiver && !isAdmin) {
-                        return; // 第三人絕對跳過
+                        return;
                     }
                 }
 
-                // 特定座號過濾 (指令 /chat 座號)
                 if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
                     return;
                 }
@@ -224,22 +224,48 @@
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
 
-                // 私訊卡片外觀
+                // 判斷：只有管理員（/admin）或「發文者本人」可以看到刪除按鈕
+                const isMyPost = (currentUserSeat && String(data.seatNumber) === currentUserSeat);
+                const canDelete = (currentRole === 'admin' || isMyPost);
+                
+                const deleteBtnHtml = canDelete 
+                    ? `<button class="btn-delete" data-id="${docId}" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ 刪除</button>` 
+                    : '';
+
                 if (data.receiverSeat) {
                     postDiv.style.background = '#fff3cd';
                     postDiv.style.borderLeft = '4px solid #ffc107';
                     postDiv.innerHTML = `
+                        ${deleteBtnHtml}
                         <strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
                         <div style="margin-top: 5px; color: #856404;">${data.content}</div>
                     `;
                 } else {
                     postDiv.innerHTML = `
+                        ${deleteBtnHtml}
                         <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
                         <div style="margin-top: 5px;">${data.content}</div>
                     `;
                 }
 
                 postsArea.appendChild(postDiv);
+            });
+
+            // 綁定刪除按鈕點擊事件
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const targetId = e.target.getAttribute('data-id');
+                    if (confirm("確定要刪除這條貼文嗎？（刪除後無法復原）")) {
+                        try {
+                            // 引入並執行 deleteDoc
+                            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+                            await deleteDoc(doc(db, "posts", targetId));
+                            alert("貼文已成功刪除！");
+                        } catch (error) {
+                            alert("刪除失敗：" + error.message);
+                        }
+                    }
+                });
             });
 
             if (seat !== 'all') {
