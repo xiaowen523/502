@@ -82,32 +82,70 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     //私訊功能
-    async function sendPrivateMessage(targetSeat, content) {
-        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
-        const userSeat = seatMatch ? seatMatch[1] : "";
+    function filterPostsBySeat(seat) {
+        const postsRef = collection(db, "posts");
+        const q = query(postsRef, orderBy("timestamp", "desc"));
 
-        // 檢查是否處於禁言狀態
-        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
-            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
-            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
-        }
+        // 精準抓取目前登入者的座號 (轉為字串避免型態不合)
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
 
-        let displayName = currentUser.displayName || "同學";
-        if (currentRole === 'admin') displayName = "管理員";
-        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
+        onSnapshot(q, (snapshot) => {
+            const postsArea = document.getElementById('posts-area');
+            postsArea.innerHTML = ''; 
+            
+            let count = 0;
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                
+                // 🔒 私訊嚴格過濾邏輯
+                if (data.receiverSeat) {
+                    const senderSeat = String(data.seatNumber);
+                    const receiverSeat = String(data.receiverSeat);
 
-        try {
-            await addDoc(collection(db, "posts"), {
-                senderName: displayName,
-                seatNumber: userSeat,
-                receiverSeat: String(targetSeat), // 🔒 註記私訊對象座號
-                content: content,
-                timestamp: serverTimestamp()
+                    const isSender = (currentUserSeat && senderSeat === currentUserSeat);
+                    const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
+                    const isAdmin = (currentRole === 'admin'); // 僅管理員可監督
+
+                    // 如果既不是發送者、也不是接收者、更不是管理員 -> 絕對隱藏！
+                    if (!isSender && !isReceiver && !isAdmin) {
+                        return; // 垂直跳過不渲染
+                    }
+                }
+
+                // 特定座號過濾 (指令 /chat 座號)
+                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
+                    return;
+                }
+
+                count++;
+                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+                
+                const postDiv = document.createElement('div');
+                postDiv.className = 'post';
+
+                // 私訊卡片外觀
+                if (data.receiverSeat) {
+                    postDiv.style.background = '#fff3cd';
+                    postDiv.style.borderLeft = '4px solid #ffc107';
+                    postDiv.innerHTML = `
+                        <strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px; color: #856404;">${data.content}</div>
+                    `;
+                } else {
+                    postDiv.innerHTML = `
+                        <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px;">${data.content}</div>
+                    `;
+                }
+
+                postsArea.appendChild(postDiv);
             });
-            alert(`已成功發送私訊給 【${targetSeat}】 號同學！`);
-        } catch (error) {
-            alert("私訊發送失敗：" + error.message);
-        }
+
+            if (seat !== 'all') {
+                alert(`已篩選座號 【${seat}】 的留言，共找到 ${count} 則記錄。（輸入 /chat all 可看全部）`);
+            }
+        });
     }
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
     const firebaseConfig = {
