@@ -10,15 +10,18 @@
         h1 { color: #1a73e8; }
         .form-group { margin-bottom: 15px; }
         input { padding: 8px; width: 80%; margin-top: 5px; }
-        button { padding: 10px 15px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
+        button { padding: 8px 12px; background: #1a73e8; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
         button:hover { background: #1557b0; }
+        .btn-board { background: #6c757d; font-size: 13px; }
+        .btn-board.active { background: #1a73e8; }
         #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; z-index: 9999; }
         #cmd-input { width: 90%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; }
         .hidden { display: none; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
-        .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; }
+        .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; position: relative; }
         .hw-card { background: #e8f0fe; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #34a853; }
         .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
+        .board-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 5px; color: #333; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -59,10 +62,20 @@
         <!-- 1. 發文區 -->
         <h3>💬 班級聊天室 / 發文區</h3>
         <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
-        <button id="btn-submit-post" style="margin-top: 10px;">發佈</button>
+        <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                發佈至看板：
+                <select id="select-post-board" style="padding: 5px; border-radius: 4px;">
+                    <option value="gossip">💬 班務/閒聊</option>
+                    <option value="homework">📖 課業討論</option>
+                    <option value="game">🎮 遊戲/社團</option>
+                </select>
+            </div>
+            <button id="btn-submit-post">發佈貼文</button>
+        </div>
 
         <hr>
-        <!-- 2. 作業區 (移至發布區正下方) -->
+        <!-- 2. 作業區 -->
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3 style="margin: 0;">📚 最新作業區</h3>
             <button id="upload-hw-btn" class="hidden" style="background: #28a745; font-size: 13px;">➕ 上傳新作業</button>
@@ -72,9 +85,21 @@
         </div>
 
         <hr>
-        <!-- 3. 聊天與發文歷史紀錄區 -->
-        <h3>💬 留言對話紀錄</h3>
-        <div id="posts-area" style="margin-top: 10px;">
+        <!-- 3. 看板分類與留言對話紀錄 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0;">💬 留言對話紀錄</h3>
+        </div>
+
+        <!-- PTT 看板分類切換按鈕 -->
+        <div style="margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 6px;">
+            <strong style="font-size: 14px; margin-right: 5px;">📌 看板：</strong>
+            <button class="btn-board active" data-board="all">全部</button>
+            <button class="btn-board" data-board="gossip">💬 班務/閒聊</button>
+            <button class="btn-board" data-board="homework">📖 課業討論</button>
+            <button class="btn-board" data-board="game">🎮 遊戲/社團</button>
+        </div>
+
+        <div id="posts-area">
             <!-- 聊天與發文會顯示在這裡 -->
         </div>
     </div>
@@ -88,17 +113,16 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, doc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
     const firebaseConfig = {
-          apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-          authDomain: "class-6fbf4.firebaseapp.com",
-          projectId: "class-6fbf4",
-          storageBucket: "class-6fbf4.firebasestorage.app",
-          messagingSenderId: "863989862320",
-          appId: "1:863989862320:web:87da48fd3d835a7775d075",
-          measurementId: "G-NDMQVP76PH"
+      apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+      authDomain: "class-6fbf4.firebaseapp.com",
+      projectId: "class-6fbf4",
+      storageBucket: "class-6fbf4.firebasestorage.app",
+      messagingSenderId: "863989862320",
+      appId: "1:863989862320:web:87d
     };
 
     const app = initializeApp(firebaseConfig);
@@ -109,12 +133,22 @@
     let currentRole = "student"; 
     let roleTimer = null;
     let bannedUsers = {}; 
+    let activeBoard = "all"; // 當前選擇的看板
+
+    const boardNames = {
+        gossip: '💬 閒聊',
+        homework: '📖 課業',
+        game: '🎮 遊戲'
+        minecraft: '麥塊'
+        roblox:'Roblox'
+        
+    };
 
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
     }
 
-    // 1. 註冊功能
+    // 註冊功能
     document.getElementById('btn-register').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const name = document.getElementById('real-name').value.trim();
@@ -124,10 +158,8 @@
         if (!seat || !name || !pwd) return alert("請填寫座號、真實姓名與密碼！");
         if (pwd !== confirmPwd) return alert("兩次輸入的密碼不一致！");
 
-        const email = formatEmail(seat);
-
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, pwd);
+            const userCredential = await createUserWithEmailAndPassword(auth, formatEmail(seat), pwd);
             await updateProfile(userCredential.user, { displayName: name });
             alert("註冊成功！已自動登入");
         } catch (error) {
@@ -135,39 +167,36 @@
         }
     });
 
-    // 2. 登入功能
+    // 登入功能
     document.getElementById('btn-login').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const pwd = document.getElementById('password').value;
 
         if (!seat || !pwd) return alert("請輸入座號與密碼！");
 
-        const email = formatEmail(seat);
-
         try {
-            await signInWithEmailAndPassword(auth, email, pwd);
+            await signInWithEmailAndPassword(auth, formatEmail(seat), pwd);
             alert("登入成功！");
         } catch (error) {
             alert("登入失敗：座號或密碼錯誤！");
         }
     });
 
-    // 3. 登出功能
+    // 登出功能
     document.getElementById('btn-logout').addEventListener('click', () => {
         signOut(auth);
     });
 
-    // 4. 監聽登入狀態改變
+    // 監聽登入狀態
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
 
-            // 判斷是否為 100 號 (老師帳號) 自動賦予老師權限
             const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
             if (seatMatch && seatMatch[1] === "100") {
-                setTemporaryRole('teacher', '傳說中的光一老師', 1440); // 預設 24 小時
+                setTemporaryRole('teacher', '傳說中的光一老師', 1440);
             }
 
             loadPosts(); 
@@ -179,7 +208,17 @@
         }
     });
 
-    // 5. 即時載入與過濾聊天紀錄
+    // 切換看板按鈕點擊事件
+    document.querySelectorAll('.btn-board').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.btn-board').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            activeBoard = e.target.getAttribute('data-board');
+            filterPostsBySeat('all');
+        });
+    });
+
+    // 即時載入貼文
     function loadPosts() {
         filterPostsBySeat('all');
     }
@@ -198,7 +237,7 @@
             let count = 0;
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
-                const docId = docSnap.id; // 取得該筆貼文的 Firebase ID
+                const docId = docSnap.id;
                 
                 // 🔒 私訊過濾
                 if (data.receiverSeat) {
@@ -209,11 +248,15 @@
                     const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
                     const isAdmin = (currentRole === 'admin');
 
-                    if (!isSender && !isReceiver && !isAdmin) {
-                        return;
-                    }
+                    if (!isSender && !isReceiver && !isAdmin) return;
                 }
 
+                // 📌 看板過濾
+                if (activeBoard !== 'all' && data.board && data.board !== activeBoard) {
+                    return;
+                }
+
+                // 特定座號過濾 (/chat 座號)
                 if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
                     return;
                 }
@@ -224,13 +267,15 @@
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
 
-                // 判斷：只有管理員（/admin）或「發文者本人」可以看到刪除按鈕
+                // 刪除按鈕 (管理員或發文者本人)
                 const isMyPost = (currentUserSeat && String(data.seatNumber) === currentUserSeat);
                 const canDelete = (currentRole === 'admin' || isMyPost);
                 
                 const deleteBtnHtml = canDelete 
                     ? `<button class="btn-delete" data-id="${docId}" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ 刪除</button>` 
                     : '';
+
+                const tagHtml = data.board ? `<span class="board-tag">[${boardNames[data.board] || '一般'}]</span>` : '';
 
                 if (data.receiverSeat) {
                     postDiv.style.background = '#fff3cd';
@@ -243,7 +288,7 @@
                 } else {
                     postDiv.innerHTML = `
                         ${deleteBtnHtml}
-                        <strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                        ${tagHtml}<strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
                         <div style="margin-top: 5px;">${data.content}</div>
                     `;
                 }
@@ -251,14 +296,12 @@
                 postsArea.appendChild(postDiv);
             });
 
-            // 綁定刪除按鈕點擊事件
+            // 綁定刪除功能
             document.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const targetId = e.target.getAttribute('data-id');
-                    if (confirm("確定要刪除這條貼文嗎？（刪除後無法復原）")) {
+                    if (confirm("確定要刪除這條貼文嗎？")) {
                         try {
-                            // 引入並執行 deleteDoc
-                            const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
                             await deleteDoc(doc(db, "posts", targetId));
                             alert("貼文已成功刪除！");
                         } catch (error) {
@@ -274,7 +317,7 @@
         });
     }
 
-    // 6. 即時載入作業列表
+    // 載入作業
     function loadHomeworks() {
         const hwRef = collection(db, "homeworks");
         const q = query(hwRef, orderBy("timestamp", "desc"));
@@ -288,8 +331,8 @@
                 return;
             }
 
-            snapshot.forEach((doc) => {
-                const data = doc.data();
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
                 const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
 
                 const hwDiv = document.createElement('div');
@@ -303,11 +346,9 @@
         });
     }
 
-    // 7. 老師上傳新作業功能
+    // 老師發佈作業
     document.getElementById('upload-hw-btn').addEventListener('click', async () => {
-        if (currentRole !== 'teacher' && currentRole !== 'admin') {
-            return alert("只有老師可以發佈作業！");
-        }
+        if (currentRole !== 'teacher' && currentRole !== 'admin') return alert("權限不足！");
 
         const title = prompt("請輸入作業科目/名稱：", "國語第十課單字");
         if (!title) return;
@@ -324,13 +365,14 @@
             });
             alert("作業發佈成功！");
         } catch (error) {
-            alert("發佈作業失敗：" + error.message);
+            alert("發佈失敗：" + error.message);
         }
     });
 
-    // 8. 發佈公開貼文到 Firebase
+    // 發佈貼文
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const content = document.getElementById('post-content').value.trim();
+        const selectedBoard = document.getElementById('select-post-board').value;
         if (!content) return alert("內容不能為空！");
 
         const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
@@ -349,6 +391,7 @@
             await addDoc(collection(db, "posts"), {
                 senderName: displayName,
                 seatNumber: userSeat,
+                board: selectedBoard,
                 content: content,
                 timestamp: serverTimestamp()
             });
@@ -358,7 +401,7 @@
         }
     });
 
-    // 發送私訊函式
+    // 私訊發送
     async function sendPrivateMessage(targetSeat, content) {
         const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "";
@@ -386,24 +429,19 @@
         }
     }
 
-    // 9. 切換指令列
+    // 指令控制
     function toggleCmdBar() {
         const cmdBar = document.getElementById('cmd-bar');
         cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
-        if (cmdBar.style.display === 'block') {
-            document.getElementById('cmd-input').focus();
-        }
+        if (cmdBar.style.display === 'block') document.getElementById('cmd-input').focus();
     }
 
     document.getElementById('btn-toggle-cmd').addEventListener('click', toggleCmdBar);
 
     document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') {
-            toggleCmdBar();
-        }
+        if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') toggleCmdBar();
     });
 
-    // 10. 執行指令邏輯
     document.getElementById('cmd-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             const cmd = e.target.value.trim();
@@ -418,47 +456,27 @@
 
         if (action === '/admin') {
             const pwd = prompt("請輸入管理員密碼：");
-            if (pwd === "admin123") {
-                setTemporaryRole('admin', '管理員', 10);
-            } else if (pwd !== null) {
-                alert("密碼錯誤！權限驗證失敗。");
-            }
+            if (pwd === "admin123") setTemporaryRole('admin', '管理員', 10);
+            else if (pwd !== null) alert("密碼錯誤！");
         } else if (action === '/teacher') {
             const pwd = prompt("請輸入光一老師認證密碼：");
-            if (pwd === "teacher888") {
-                setTemporaryRole('teacher', '傳說中的光一老師', 10);
-            } else if (pwd !== null) {
-                alert("密碼錯誤！權限驗證失敗。");
-            }
+            if (pwd === "teacher888") setTemporaryRole('teacher', '傳說中的光一老師', 10);
+            else if (pwd !== null) alert("密碼錯誤！");
         } else if (action === '/msg') {
             const targetSeat = parts[1];
             const msgContent = parts.slice(2).join(' ').trim();
-
-            if (!targetSeat || !msgContent) {
-                return alert("格式錯誤！使用方式：/msg 座號 訊息內容 (例: /msg 5 明天要帶什麼？)");
-            }
-
+            if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
             sendPrivateMessage(targetSeat, msgContent);
         } else if (action === '/chat') {
             const targetSeat = parts[1];
-            if (!targetSeat) {
-                alert("請輸入座號！格式：/chat 座號 (輸入 /chat all 可看全部)");
-            } else {
-                filterPostsBySeat(targetSeat);
-            }
+            if (!targetSeat) alert("請輸入座號！/chat 座號 (或 /chat all)");
+            else filterPostsBySeat(targetSeat);
         } else if (action === '/ban') {
-            if (currentRole !== 'admin') {
-                return alert("權限不足！只有管理員可以使用 /ban 指令。");
-            }
+            if (currentRole !== 'admin') return alert("權限不足！");
             const targetSeat = parts[1];
             const minutes = parseInt(parts[2]);
-
-            if (!targetSeat || isNaN(minutes) || minutes <= 0) {
-                return alert("格式錯誤！使用方式：/ban 座號 分鐘數 (例: /ban 5 10)");
-            }
-
-            const expireTime = Date.now() + minutes * 60 * 1000;
-            bannedUsers[targetSeat] = expireTime;
+            if (!targetSeat || isNaN(minutes) || minutes <= 0) return alert("格式錯誤！/ban 座號 分鐘數");
+            bannedUsers[targetSeat] = Date.now() + minutes * 60 * 1000;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
         } else {
             alert("未知指令");
@@ -471,9 +489,7 @@
         badge.innerText = displayName;
         badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
 
-        // 控制發佈作業按鈕顯示/隱藏
         document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
-
         alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
 
         if (roleTimer) clearTimeout(roleTimer);
@@ -482,7 +498,7 @@
             badge.innerText = '一般學生';
             badge.style.background = '#888';
             document.getElementById('upload-hw-btn').classList.add('hidden');
-            alert('特殊權限時間已到，恢復為一般學生狀態。');
+            alert('權限已恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
 </script>
