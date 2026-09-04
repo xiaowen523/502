@@ -253,17 +253,35 @@ const firebaseConfig = {
         });
     });
 
-    // 即時載入管理員日誌
+    
+        // 即時載入管理員日誌（已修正排序與時間處理）
     function loadLogs() {
         const logsRef = collection(db, "logs");
-        const q = query(logsRef, orderBy("timestamp", "desc"));
-
-        onSnapshot(q, (snapshot) => {
+        // 移除 complex query，改由前台排序，避免 Firebase 欄位未建立或 timestamp 為 null 時卡住
+        onSnapshot(logsRef, (snapshot) => {
             const logList = document.getElementById('log-list');
+            if (!logList) return;
+            
             logList.innerHTML = '';
 
+            let logsArray = [];
             snapshot.forEach((docSnap) => {
-                const data = docSnap.data();
+                logsArray.push({ id: docSnap.id, ...docSnap.data() });
+            });
+
+            // 前台手動排序：新日誌排在前面
+            logsArray.sort((a, b) => {
+                const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now();
+                const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now();
+                return timeB - timeA;
+            });
+
+            if (logsArray.length === 0) {
+                logList.innerHTML = '<div style="color: #888;">目前尚無任何日誌紀錄。</div>';
+                return;
+            }
+
+            logsArray.forEach((data) => {
                 const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
                 
                 const logItem = document.createElement('div');
@@ -271,8 +289,11 @@ const firebaseConfig = {
                 logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${data.detail}`;
                 logList.appendChild(logItem);
             });
+        }, (error) => {
+            console.error("日誌讀取失敗：", error);
         });
     }
+
 
     // 載入貼文
     function loadPosts() {
