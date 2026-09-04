@@ -22,6 +22,19 @@
         .hw-card { background: #e8f0fe; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #34a853; }
         .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
         .board-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 5px; color: #333; font-weight: bold; }
+
+        /* 📜 日誌美化與滾動條設定 */
+        #log-list {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 13px;
+            border-top: 1px dashed #444;
+            padding-top: 8px;
+            padding-right: 5px;
+        }
+        #log-list::-webkit-scrollbar { width: 6px; }
+        #log-list::-webkit-scrollbar-track { background: #111; }
+        #log-list::-webkit-scrollbar-thumb { background: #0f0; border-radius: 3px; }
     </style>
 </head>
 <body>
@@ -58,10 +71,10 @@
             <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
         </div>
 
-        <!-- 📜 管理員專屬日誌面板 (預設隱藏，切換為 /admin 才顯示) -->
+        <!-- 📜 日誌面板 (透過 /log 解鎖顯示) -->
         <div id="admin-log-section" class="hidden" style="background: #222; color: #0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-family: monospace;">
-            <h3 style="color: #0f0; margin-top: 0;">📜 管理員操作日誌 (Audit Logs)</h3>
-            <div id="log-list" style="max-height: 180px; overflow-y: auto; font-size: 13px; border-top: 1px dashed #444; padding-top: 8px;">
+            <h3 style="color: #0f0; margin-top: 0;">📜 操作日誌 (Audit Logs)</h3>
+            <div id="log-list">
                 <!-- 日誌即時顯示區 -->
             </div>
         </div>
@@ -119,16 +132,16 @@
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="指令例: /msg 5 哈囉, /ban 5 10, /chat 5, /admin, /teacher...">
+    <input type="text" id="cmd-input" placeholder="指令例: /msg 5 哈囉, /log, /chat 5, /admin, /teacher...">
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, doc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
-const firebaseConfig = {
+    // 🔴 這裡請填入你的 Firebase 金鑰
+    const firebaseConfig = {
   apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
   authDomain: "class-6fbf4.firebaseapp.com",
   projectId: "class-6fbf4",
@@ -136,7 +149,7 @@ const firebaseConfig = {
   messagingSenderId: "863989862320",
   appId: "1:863989862320:web:87da48fd3d835a7775d075",
   measurementId: "G-NDMQVP76PH"
-};
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -160,7 +173,19 @@ const firebaseConfig = {
         return `student_seat_${seat}@class52.com`;
     }
 
-    // 日誌自動紀錄功能
+    // 🕒 時間格式動態轉換器
+    function parseCustomTime(timestamp) {
+        if (!timestamp) return '剛剛';
+        if (typeof timestamp.toDate === 'function') {
+            return timestamp.toDate().toLocaleString('zh-TW');
+        }
+        if (typeof timestamp === 'number') {
+            return new Date(timestamp).toLocaleString('zh-TW');
+        }
+        return '剛剛';
+    }
+
+    // 日誌自動紀錄
     async function logAction(actionType, detail) {
         const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "系統";
@@ -243,7 +268,7 @@ const firebaseConfig = {
         }
     });
 
-    // 看板按鈕切換
+    // 看板切換
     document.querySelectorAll('.btn-board').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.btn-board').forEach(b => b.classList.remove('active'));
@@ -253,15 +278,12 @@ const firebaseConfig = {
         });
     });
 
-    
-        // 即時載入管理員日誌（已修正排序與時間處理）
+    // 載入日誌
     function loadLogs() {
         const logsRef = collection(db, "logs");
-        // 移除 complex query，改由前台排序，避免 Firebase 欄位未建立或 timestamp 為 null 時卡住
         onSnapshot(logsRef, (snapshot) => {
             const logList = document.getElementById('log-list');
             if (!logList) return;
-            
             logList.innerHTML = '';
 
             let logsArray = [];
@@ -269,33 +291,26 @@ const firebaseConfig = {
                 logsArray.push({ id: docSnap.id, ...docSnap.data() });
             });
 
-            // 前台手動排序：新日誌排在前面
+            // 前台手動排序
             logsArray.sort((a, b) => {
-                const timeA = a.timestamp ? a.timestamp.toMillis() : Date.now();
-                const timeB = b.timestamp ? b.timestamp.toMillis() : Date.now();
+                const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp) : 0;
+                const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp) : 0;
                 return timeB - timeA;
             });
 
-            if (logsArray.length === 0) {
-                logList.innerHTML = '<div style="color: #888;">目前尚無任何日誌紀錄。</div>';
-                return;
-            }
-
             logsArray.forEach((data) => {
-                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
-                
+                const timeStr = parseCustomTime(data.timestamp);
                 const logItem = document.createElement('div');
                 logItem.style.marginBottom = '4px';
                 logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${data.detail}`;
                 logList.appendChild(logItem);
             });
-        }, (error) => {
-            console.error("日誌讀取失敗：", error);
+
+            logList.scrollTop = 0; // 自動捲滾到頂部
         });
     }
 
-
-    // 載入貼文
+    // 載入與篩選貼文
     function loadPosts() {
         filterPostsBySeat('all');
     }
@@ -311,7 +326,6 @@ const firebaseConfig = {
             const postsArea = document.getElementById('posts-area');
             postsArea.innerHTML = ''; 
             
-            let count = 0;
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
                 const docId = docSnap.id;
@@ -320,27 +334,21 @@ const firebaseConfig = {
                 if (data.receiverSeat) {
                     const senderSeat = String(data.seatNumber);
                     const receiverSeat = String(data.receiverSeat);
-
                     const isSender = (currentUserSeat && senderSeat === currentUserSeat);
                     const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
                     const isAdmin = (currentRole === 'admin');
-
                     if (!isSender && !isReceiver && !isAdmin) return;
                 }
 
                 // 看板過濾
                 if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
-
-                // 特定座號過濾
                 if (seat !== 'all' && String(data.seatNumber) !== String(seat)) return;
 
-                count++;
-                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
-                
+                // 🕒 動態時間解析
+                const timeStr = parseCustomTime(data.timestamp);
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
 
-                // 刪除權限
                 const isMyPost = (currentUserSeat && String(data.seatNumber) === currentUserSeat);
                 const canDelete = (currentRole === 'admin' || isMyPost);
                 
@@ -369,7 +377,7 @@ const firebaseConfig = {
                 postsArea.appendChild(postDiv);
             });
 
-            // 刪除按鈕邏輯
+            // 刪除按鈕事件 bind
             document.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const targetId = e.target.getAttribute('data-id');
@@ -384,10 +392,6 @@ const firebaseConfig = {
                     }
                 });
             });
-
-            if (seat !== 'all') {
-                alert(`已篩選座號 【${seat}】 的留言，共找到 ${count} 則記錄。（輸入 /chat all 可看全部）`);
-            }
         });
     }
 
@@ -407,7 +411,7 @@ const firebaseConfig = {
 
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
-                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+                const timeStr = parseCustomTime(data.timestamp);
 
                 const hwDiv = document.createElement('div');
                 hwDiv.className = 'hw-card';
@@ -420,32 +424,7 @@ const firebaseConfig = {
         });
     }
 
-    // 老師發佈作業
-    document.getElementById('upload-hw-btn').addEventListener('click', async () => {
-        if (currentRole !== 'teacher' && currentRole !== 'admin') return alert("權限不足！");
-
-        const title = prompt("請輸入作業科目/名稱：", "國語第十課單字");
-        if (!title) return;
-
-        const content = prompt("請輸入作業詳細說明或要求：");
-        if (!content) return;
-
-        try {
-            await addDoc(collection(db, "homeworks"), {
-                title: title,
-                content: content,
-                author: "光一老師",
-                timestamp: serverTimestamp()
-            });
-            alert("作業發佈成功！");
-            logAction("發佈作業", `題目: ${title} | 內容: ${content}`);
-        } catch (error) {
-            alert("發佈失敗：" + error.message);
-        }
-    });
-
-    // 發佈貼文
-    // 修正版：發佈貼文邏輯
+    // 發佈貼文 (含可讀文件 ID 格式：seat_座號_毫秒)
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const contentInput = document.getElementById('post-content');
         const boardSelect = document.getElementById('select-post-board');
@@ -455,27 +434,26 @@ const firebaseConfig = {
 
         if (!content) return alert("內容不能為空！");
 
-        // 取得座號
-        let userSeat = "未知";
+        let userSeat = "00";
         if (currentUser && currentUser.email) {
             const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
             if (seatMatch) userSeat = seatMatch[1];
         }
 
-        // 禁言檢查
         if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
             const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
             return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
         }
 
-        // 決定顯示名稱
         let displayName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
         if (currentRole === 'admin') displayName = "管理員";
         if (currentRole === 'teacher') displayName = "傳說中的光一老師";
 
         try {
-            // 強制寫入全部 5 個欄位
-            const docRef = await addDoc(collection(db, "posts"), {
+            // 📌 產生清晰的自訂文件 ID，例如：seat_5_1725456812000
+            const customDocId = `seat_${userSeat}_${Date.now()}`;
+
+            await setDoc(doc(db, "posts", customDocId), {
                 senderName: displayName,
                 seatNumber: userSeat,
                 board: selectedBoard,
@@ -483,46 +461,12 @@ const firebaseConfig = {
                 timestamp: serverTimestamp()
             });
 
-            console.log("寫入成功！文章 ID：", docRef.id);
             contentInput.value = '';
-
-            // 觸發日誌
             logAction("發佈貼文", `看板: ${boardNames[selectedBoard] || selectedBoard} | 內容: ${content}`);
-            alert("發佈成功！");
         } catch (error) {
-            console.error("Firebase 寫入失敗詳情：", error);
-            alert("發佈失敗，請查看主機板控制台 (F12) 的錯誤訊息！");
+            alert("發佈失敗：" + error.message);
         }
     });
-
-    // 私訊發送
-    async function sendPrivateMessage(targetSeat, content) {
-        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
-        const userSeat = seatMatch ? seatMatch[1] : "";
-
-        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
-            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
-            return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
-        }
-
-        let displayName = currentUser.displayName || "同學";
-        if (currentRole === 'admin') displayName = "管理員";
-        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
-
-        try {
-            await addDoc(collection(db, "posts"), {
-                senderName: displayName,
-                seatNumber: userSeat,
-                receiverSeat: String(targetSeat),
-                content: content,
-                timestamp: serverTimestamp()
-            });
-            alert(`已成功發送私訊給 【${targetSeat}】 號同學！`);
-            logAction("發送私訊", `收件人: ${targetSeat}號 | 內容: ${content}`);
-        } catch (error) {
-            alert("私訊發送失敗：" + error.message);
-        }
-    }
 
     // 指令系統
     function toggleCmdBar() {
@@ -545,7 +489,7 @@ const firebaseConfig = {
         }
     });
 
-        function executeCommand(cmd) {
+    function executeCommand(cmd) {
         logAction("執行指令", `輸入: ${cmd}`);
         const parts = cmd.split(' ');
         const action = parts[0];
@@ -555,15 +499,15 @@ const firebaseConfig = {
             if (pwd === "admin123") setTemporaryRole('admin', '管理員', 10);
             else if (pwd !== null) alert("密碼錯誤！");
         } else if (action === '/log') {
-            // 📌 新增 /log 指令，專門用來解鎖日誌面板
+            // 📌 輸入 /log 並驗證密碼 log 即可展開面板
             const pwd = prompt("請輸入查看日誌密碼：");
             if (pwd === "log") {
                 const logSection = document.getElementById('admin-log-section');
                 logSection.classList.remove('hidden');
                 loadLogs();
-                alert("日誌面板已成功解鎖！");
+                alert("日誌面板已解鎖！");
             } else if (pwd !== null) {
-                alert("密碼錯誤！無法查看日誌。");
+                alert("密碼錯誤！");
             }
         } else if (action === '/teacher') {
             const pwd = prompt("請輸入光一老師認證密碼：");
@@ -573,7 +517,21 @@ const firebaseConfig = {
             const targetSeat = parts[1];
             const msgContent = parts.slice(2).join(' ').trim();
             if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
-            sendPrivateMessage(targetSeat, msgContent);
+            
+            // 私訊發送
+            const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
+            const userSeat = seatMatch ? seatMatch[1] : "00";
+            let displayName = currentUser.displayName || "同學";
+            if (currentRole === 'admin') displayName = "管理員";
+
+            const customDocId = `msg_${userSeat}_to_${targetSeat}_${Date.now()}`;
+            setDoc(doc(db, "posts", customDocId), {
+                senderName: displayName,
+                seatNumber: userSeat,
+                receiverSeat: String(targetSeat),
+                content: msgContent,
+                timestamp: serverTimestamp()
+            }).then(() => alert(`已傳送私訊給 ${targetSeat} 號！`));
         } else if (action === '/chat') {
             const targetSeat = parts[1];
             if (!targetSeat) alert("請輸入座號！/chat 座號 (或 /chat all)");
@@ -585,12 +543,10 @@ const firebaseConfig = {
             if (!targetSeat || isNaN(minutes) || minutes <= 0) return alert("格式錯誤！/ban 座號 分鐘數");
             bannedUsers[targetSeat] = Date.now() + minutes * 60 * 1000;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
-            logAction("執行禁言", `禁言座號: ${targetSeat}號 | 時間: ${minutes}分鐘`);
         } else {
             alert("未知指令");
         }
     }
-
 
     function setTemporaryRole(role, displayName, minutes) {
         currentRole = role;
@@ -599,16 +555,6 @@ const firebaseConfig = {
         badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
 
         document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
-        
-        // 顯示管理員日誌區塊
-        const logSection = document.getElementById('admin-log-section');
-        if (role === 'admin') {
-            logSection.classList.remove('hidden');
-            loadLogs();
-        } else {
-            logSection.classList.add('hidden');
-        }
-
         alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
 
         if (roleTimer) clearTimeout(roleTimer);
@@ -617,7 +563,6 @@ const firebaseConfig = {
             badge.innerText = '一般學生';
             badge.style.background = '#888';
             document.getElementById('upload-hw-btn').classList.add('hidden');
-            logSection.classList.add('hidden');
             alert('權限已恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
