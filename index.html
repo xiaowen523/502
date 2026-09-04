@@ -527,7 +527,7 @@ const firebaseConfig = {
         }
     });
 
-    function executeCommand(cmd) {
+        function executeCommand(cmd) {
         logAction("執行指令", `輸入: ${cmd}`);
         const parts = cmd.split(' ');
         const action = parts[0];
@@ -536,6 +536,17 @@ const firebaseConfig = {
             const pwd = prompt("請輸入管理員密碼：");
             if (pwd === "admin123") setTemporaryRole('admin', '管理員', 10);
             else if (pwd !== null) alert("密碼錯誤！");
+        } else if (action === '/log') {
+            // 📌 新增 /log 指令，專門用來解鎖日誌面板
+            const pwd = prompt("請輸入查看日誌密碼：");
+            if (pwd === "log") {
+                const logSection = document.getElementById('admin-log-section');
+                logSection.classList.remove('hidden');
+                loadLogs();
+                alert("日誌面板已成功解鎖！");
+            } else if (pwd !== null) {
+                alert("密碼錯誤！無法查看日誌。");
+            }
         } else if (action === '/teacher') {
             const pwd = prompt("請輸入光一老師認證密碼：");
             if (pwd === "teacher888") setTemporaryRole('teacher', '傳說中的光一老師', 10);
@@ -561,6 +572,7 @@ const firebaseConfig = {
             alert("未知指令");
         }
     }
+
 
     function setTemporaryRole(role, displayName, minutes) {
         currentRole = role;
