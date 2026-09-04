@@ -445,35 +445,53 @@ const firebaseConfig = {
     });
 
     // 發佈貼文
+    // 修正版：發佈貼文邏輯
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
-        const content = document.getElementById('post-content').value.trim();
-        const selectedBoard = document.getElementById('select-post-board').value;
+        const contentInput = document.getElementById('post-content');
+        const boardSelect = document.getElementById('select-post-board');
+
+        const content = contentInput ? contentInput.value.trim() : "";
+        const selectedBoard = boardSelect ? boardSelect.value : "gossip";
+
         if (!content) return alert("內容不能為空！");
 
-        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
-        const userSeat = seatMatch ? seatMatch[1] : "";
+        // 取得座號
+        let userSeat = "未知";
+        if (currentUser && currentUser.email) {
+            const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
+            if (seatMatch) userSeat = seatMatch[1];
+        }
 
+        // 禁言檢查
         if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
             const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
             return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
         }
 
-        let displayName = currentUser.displayName || "同學";
+        // 決定顯示名稱
+        let displayName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
         if (currentRole === 'admin') displayName = "管理員";
         if (currentRole === 'teacher') displayName = "傳說中的光一老師";
 
         try {
-            await addDoc(collection(db, "posts"), {
+            // 強制寫入全部 5 個欄位
+            const docRef = await addDoc(collection(db, "posts"), {
                 senderName: displayName,
                 seatNumber: userSeat,
                 board: selectedBoard,
                 content: content,
                 timestamp: serverTimestamp()
             });
-            document.getElementById('post-content').value = '';
-            logAction("發佈貼文", `看板: ${boardNames[selectedBoard]} | 內容: ${content}`);
+
+            console.log("寫入成功！文章 ID：", docRef.id);
+            contentInput.value = '';
+
+            // 觸發日誌
+            logAction("發佈貼文", `看板: ${boardNames[selectedBoard] || selectedBoard} | 內容: ${content}`);
+            alert("發佈成功！");
         } catch (error) {
-            alert("發佈失敗：" + error.message);
+            console.error("Firebase 寫入失敗詳情：", error);
+            alert("發佈失敗，請查看主機板控制台 (F12) 的錯誤訊息！");
         }
     });
 
