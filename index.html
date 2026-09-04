@@ -32,7 +32,7 @@
         <button id="btn-toggle-cmd" style="padding: 6px 12px; font-size: 13px; background: #6c757d;">⚡ 指令</button>
     </div>
     
-    <!-- 註冊與登入區塊 -->
+    <!-- 1. 註冊與登入區塊 -->
     <div id="auth-section">
         <h3>註冊 / 登入</h3>
         <div class="form-group">
@@ -51,15 +51,23 @@
         <button id="btn-login">登入</button>
     </div>
 
-    <!-- 登入後的主畫面 -->
+    <!-- 2. 登入後的主畫面 -->
     <div id="main-section" class="hidden">
         <div id="status-display" style="margin-bottom: 15px;">
             目前身分：<span class="status-badge" id="role-badge">一般學生</span>
             <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
         </div>
+
+        <!-- 📜 管理員專屬日誌面板 (預設隱藏，切換為 /admin 才顯示) -->
+        <div id="admin-log-section" class="hidden" style="background: #222; color: #0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-family: monospace;">
+            <h3 style="color: #0f0; margin-top: 0;">📜 管理員操作日誌 (Audit Logs)</h3>
+            <div id="log-list" style="max-height: 180px; overflow-y: auto; font-size: 13px; border-top: 1px dashed #444; padding-top: 8px;">
+                <!-- 日誌即時顯示區 -->
+            </div>
+        </div>
         
         <hr>
-        <!-- 1. 發文區 -->
+        <!-- 發文區 -->
         <h3>💬 班級聊天室 / 發文區</h3>
         <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
         <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
@@ -69,15 +77,15 @@
                     <option value="gossip">💬 班務/閒聊</option>
                     <option value="homework">📖 課業討論</option>
                     <option value="game">🎮 遊戲/社團</option>
-                    <option value="minecraft">麥塊</option>
-                    <option value="roblox">Roblox</option>
+                    <option value="minecraft">⛏️ 麥塊專區</option>
+                    <option value="roblox">🤖 Roblox</option>
                 </select>
             </div>
             <button id="btn-submit-post">發佈貼文</button>
         </div>
 
         <hr>
-        <!-- 2. 作業區 -->
+        <!-- 作業區 -->
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3 style="margin: 0;">📚 最新作業區</h3>
             <button id="upload-hw-btn" class="hidden" style="background: #28a745; font-size: 13px;">➕ 上傳新作業</button>
@@ -87,7 +95,7 @@
         </div>
 
         <hr>
-        <!-- 3. 看板分類與留言對話紀錄 -->
+        <!-- 看板分類與留言對話紀錄 -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3 style="margin: 0;">💬 留言對話紀錄</h3>
         </div>
@@ -96,15 +104,15 @@
         <div style="margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 6px;">
             <strong style="font-size: 14px; margin-right: 5px;">📌 看板：</strong>
             <button class="btn-board active" data-board="all">全部</button>
-            <button class="btn-board" data-board="gossip">💬 班務/閒聊</button>
-            <button class="btn-board" data-board="homework">📖 課業討論</button>
-            <button class="btn-board" data-board="game">🎮 遊戲/社團</button>
-            <button class="btn-board" data-board="minecraft">麥塊</button>
-            <button class="btn-board" data-board="roblox">Roblox</button>
+            <button class="btn-board" data-board="gossip">💬 閒聊</button>
+            <button class="btn-board" data-board="homework">📖 課業</button>
+            <button class="btn-board" data-board="game">🎮 遊戲</button>
+            <button class="btn-board" data-board="minecraft">⛏️ 麥塊</button>
+            <button class="btn-board" data-board="roblox">🤖 Roblox</button>
         </div>
 
         <div id="posts-area">
-            <!-- 聊天與發文會顯示在這裡 -->
+            <!-- 貼文動態載入區 -->
         </div>
     </div>
 </div>
@@ -120,14 +128,15 @@
     import { getFirestore, collection, addDoc, doc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 這裡請貼上你在 Firebase Console 複製的金鑰！
-    const firebaseConfig = {
-      apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-      authDomain: "class-6fbf4.firebaseapp.com",
-      projectId: "class-6fbf4",
-      storageBucket: "class-6fbf4.firebasestorage.app",
-      messagingSenderId: "863989862320",
-      appId: "1:863989862320:web:87d"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+  authDomain: "class-6fbf4.firebaseapp.com",
+  projectId: "class-6fbf4",
+  storageBucket: "class-6fbf4.firebasestorage.app",
+  messagingSenderId: "863989862320",
+  appId: "1:863989862320:web:87da48fd3d835a7775d075",
+  measurementId: "G-NDMQVP76PH"
+};
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -137,19 +146,38 @@
     let currentRole = "student"; 
     let roleTimer = null;
     let bannedUsers = {}; 
-    let activeBoard = "all"; // 當前選擇的看板
+    let activeBoard = "all";
 
     const boardNames = {
         gossip: '💬 閒聊',
         homework: '📖 課業',
         game: '🎮 遊戲',
-        minecraft:'麥塊',
-        roblox: 'Roblox'
-        
+        minecraft: '⛏️ 麥塊',
+        roblox: '🤖 Roblox'
     };
 
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
+    }
+
+    // 日誌自動紀錄功能
+    async function logAction(actionType, detail) {
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const userSeat = seatMatch ? seatMatch[1] : "系統";
+        const userName = currentUser ? (currentUser.displayName || "同學") : "未登入";
+
+        try {
+            await addDoc(collection(db, "logs"), {
+                operatorSeat: userSeat,
+                operatorName: userName,
+                role: currentRole,
+                action: actionType,
+                detail: detail,
+                timestamp: serverTimestamp()
+            });
+        } catch (error) {
+            console.error("日誌紀錄失敗:", error);
+        }
     }
 
     // 註冊功能
@@ -166,6 +194,7 @@
             const userCredential = await createUserWithEmailAndPassword(auth, formatEmail(seat), pwd);
             await updateProfile(userCredential.user, { displayName: name });
             alert("註冊成功！已自動登入");
+            logAction("帳號註冊", `座號: ${seat} | 姓名: ${name}`);
         } catch (error) {
             alert("註冊失敗：" + error.message);
         }
@@ -181,6 +210,7 @@
         try {
             await signInWithEmailAndPassword(auth, formatEmail(seat), pwd);
             alert("登入成功！");
+            logAction("使用者登入", `座號: ${seat}`);
         } catch (error) {
             alert("登入失敗：座號或密碼錯誤！");
         }
@@ -188,6 +218,7 @@
 
     // 登出功能
     document.getElementById('btn-logout').addEventListener('click', () => {
+        logAction("使用者登出", "登出系統");
         signOut(auth);
     });
 
@@ -212,7 +243,7 @@
         }
     });
 
-    // 切換看板按鈕點擊事件
+    // 看板按鈕切換
     document.querySelectorAll('.btn-board').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.btn-board').forEach(b => b.classList.remove('active'));
@@ -222,7 +253,28 @@
         });
     });
 
-    // 即時載入貼文
+    // 即時載入管理員日誌
+    function loadLogs() {
+        const logsRef = collection(db, "logs");
+        const q = query(logsRef, orderBy("timestamp", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            const logList = document.getElementById('log-list');
+            logList.innerHTML = '';
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
+                
+                const logItem = document.createElement('div');
+                logItem.style.marginBottom = '4px';
+                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${data.detail}`;
+                logList.appendChild(logItem);
+            });
+        });
+    }
+
+    // 載入貼文
     function loadPosts() {
         filterPostsBySeat('all');
     }
@@ -243,7 +295,7 @@
                 const data = docSnap.data();
                 const docId = docSnap.id;
                 
-                // 🔒 私訊過濾
+                // 私訊過濾
                 if (data.receiverSeat) {
                     const senderSeat = String(data.seatNumber);
                     const receiverSeat = String(data.receiverSeat);
@@ -255,15 +307,11 @@
                     if (!isSender && !isReceiver && !isAdmin) return;
                 }
 
-                // 📌 看板過濾
-                if (activeBoard !== 'all' && data.board && data.board !== activeBoard) {
-                    return;
-                }
+                // 看板過濾
+                if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
 
-                // 特定座號過濾 (/chat 座號)
-                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) {
-                    return;
-                }
+                // 特定座號過濾
+                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) return;
 
                 count++;
                 const timeStr = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString('zh-TW') : '剛剛';
@@ -271,7 +319,7 @@
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
 
-                // 刪除按鈕 (管理員或發文者本人)
+                // 刪除權限
                 const isMyPost = (currentUserSeat && String(data.seatNumber) === currentUserSeat);
                 const canDelete = (currentRole === 'admin' || isMyPost);
                 
@@ -300,14 +348,15 @@
                 postsArea.appendChild(postDiv);
             });
 
-            // 綁定刪除功能
+            // 刪除按鈕邏輯
             document.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const targetId = e.target.getAttribute('data-id');
                     if (confirm("確定要刪除這條貼文嗎？")) {
                         try {
                             await deleteDoc(doc(db, "posts", targetId));
-                            alert("貼文已成功刪除！");
+                            alert("貼文已刪除！");
+                            logAction("刪除貼文", `刪除文章 ID: ${targetId}`);
                         } catch (error) {
                             alert("刪除失敗：" + error.message);
                         }
@@ -368,6 +417,7 @@
                 timestamp: serverTimestamp()
             });
             alert("作業發佈成功！");
+            logAction("發佈作業", `題目: ${title} | 內容: ${content}`);
         } catch (error) {
             alert("發佈失敗：" + error.message);
         }
@@ -384,7 +434,7 @@
 
         if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
             const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
-            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
+            return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
         }
 
         let displayName = currentUser.displayName || "同學";
@@ -400,6 +450,7 @@
                 timestamp: serverTimestamp()
             });
             document.getElementById('post-content').value = '';
+            logAction("發佈貼文", `看板: ${boardNames[selectedBoard]} | 內容: ${content}`);
         } catch (error) {
             alert("發佈失敗：" + error.message);
         }
@@ -412,7 +463,7 @@
 
         if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
             const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
-            return alert(`你已被管理員禁言！剩餘時間：${remainingMins} 分鐘。`);
+            return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
         }
 
         let displayName = currentUser.displayName || "同學";
@@ -428,12 +479,13 @@
                 timestamp: serverTimestamp()
             });
             alert(`已成功發送私訊給 【${targetSeat}】 號同學！`);
+            logAction("發送私訊", `收件人: ${targetSeat}號 | 內容: ${content}`);
         } catch (error) {
             alert("私訊發送失敗：" + error.message);
         }
     }
 
-    // 指令控制
+    // 指令系統
     function toggleCmdBar() {
         const cmdBar = document.getElementById('cmd-bar');
         cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
@@ -455,6 +507,7 @@
     });
 
     function executeCommand(cmd) {
+        logAction("執行指令", `輸入: ${cmd}`);
         const parts = cmd.split(' ');
         const action = parts[0];
 
@@ -482,6 +535,7 @@
             if (!targetSeat || isNaN(minutes) || minutes <= 0) return alert("格式錯誤！/ban 座號 分鐘數");
             bannedUsers[targetSeat] = Date.now() + minutes * 60 * 1000;
             alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
+            logAction("執行禁言", `禁言座號: ${targetSeat}號 | 時間: ${minutes}分鐘`);
         } else {
             alert("未知指令");
         }
@@ -494,6 +548,16 @@
         badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
 
         document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
+        
+        // 顯示管理員日誌區塊
+        const logSection = document.getElementById('admin-log-section');
+        if (role === 'admin') {
+            logSection.classList.remove('hidden');
+            loadLogs();
+        } else {
+            logSection.classList.add('hidden');
+        }
+
         alert(`已切換至【${displayName}】模式，時效 ${minutes} 分鐘。`);
 
         if (roleTimer) clearTimeout(roleTimer);
@@ -502,6 +566,7 @@
             badge.innerText = '一般學生';
             badge.style.background = '#888';
             document.getElementById('upload-hw-btn').classList.add('hidden');
+            logSection.classList.add('hidden');
             alert('權限已恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
