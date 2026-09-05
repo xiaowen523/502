@@ -147,7 +147,7 @@
     </div>
 </div>
 
-<!-- 📜 全螢幕/彈窗日誌面板 (獨立於視窗外) -->
+<!-- 📜 全螢幕/彈窗日誌面板 (獨立於主視窗外) -->
 <div id="admin-log-section" class="hidden log-fullscreen-overlay">
     <div class="log-header">
         <h2 style="margin: 0; color: #0f0; font-size: 20px;">📜 班級系統操作日誌 (Audit Logs)</h2>
@@ -174,7 +174,6 @@
     import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 請替換為你的 Firebase 金鑰
-
 const firebaseConfig = {
   apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
   authDomain: "class-6fbf4.firebaseapp.com",
@@ -309,7 +308,7 @@ const firebaseConfig = {
         });
     });
 
-    // 全螢幕日誌切換
+    // 全螢幕日誌切換與密碼防護
     function toggleLogWindow() {
         const logSection = document.getElementById('admin-log-section');
         
@@ -358,7 +357,12 @@ const firebaseConfig = {
                 const timeStr = parseCustomTime(data.timestamp);
                 const logItem = document.createElement('div');
                 logItem.style.marginBottom = '6px';
-                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${data.detail}`;
+
+                // 📌 文章編號正則匹配，自動轉換為青藍色高亮字體 (#00ffff)
+                let detailText = data.detail || '';
+                detailText = detailText.replace(/(文章編號: seat_\d+_\d+)/g, '<span style="color: #00ffff; font-weight: bold;">$1</span>');
+
+                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
                 logList.appendChild(logItem);
             });
 
@@ -474,7 +478,7 @@ const firebaseConfig = {
         });
     }
 
-    // 發佈貼文
+    // 發佈貼文 (將自訂文章 ID 帶入 logAction 中)
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const contentInput = document.getElementById('post-content');
         const boardSelect = document.getElementById('select-post-board');
@@ -500,6 +504,7 @@ const firebaseConfig = {
         if (currentRole === 'teacher') displayName = "傳說中的光一老師";
 
         try {
+            // 📌 建立清晰可讀的文章 ID
             const customDocId = `seat_${userSeat}_${Date.now()}`;
 
             await setDoc(doc(db, "posts", customDocId), {
@@ -511,7 +516,9 @@ const firebaseConfig = {
             });
 
             contentInput.value = '';
-            logAction("發佈貼文", `看板: ${boardNames[selectedBoard] || selectedBoard} | 內容: ${content}`);
+
+            // 📌 寫入日誌：詳細包含「文章編號」
+            logAction("發佈貼文", `文章編號: ${customDocId} | 看板: ${boardNames[selectedBoard] || selectedBoard} | 內容: ${content}`);
         } catch (error) {
             alert("發佈失敗：" + error.message);
         }
