@@ -14,27 +14,53 @@
         button:hover { background: #1557b0; }
         .btn-board { background: #6c757d; font-size: 13px; }
         .btn-board.active { background: #1a73e8; }
-        #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; z-index: 9999; }
-        #cmd-input { width: 90%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; }
-        .hidden { display: none; }
+        #cmd-bar { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #333; padding: 10px; box-sizing: border-box; z-index: 99999; }
+        #cmd-input { width: 95%; background: black; color: #0f0; border: 1px solid #555; padding: 10px; font-family: monospace; font-size: 14px; }
+        .hidden { display: none !important; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
         .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; position: relative; }
         .hw-card { background: #e8f0fe; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #34a853; }
         .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
         .board-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 5px; color: #333; font-weight: bold; }
 
-        /* 📜 日誌美化與滾動條設定 */
-        #log-list {
-            max-height: 200px;
-            overflow-y: auto;
-            font-size: 13px;
-            border-top: 1px dashed #444;
-            padding-top: 8px;
-            padding-right: 5px;
+        /* 📜 全螢幕日誌覆蓋層 (Full Screen Overlay) */
+        .log-fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #121212;
+            color: #0f0;
+            z-index: 10000;
+            box-sizing: border-box;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Courier New', Courier, monospace;
         }
-        #log-list::-webkit-scrollbar { width: 6px; }
-        #log-list::-webkit-scrollbar-track { background: #111; }
-        #log-list::-webkit-scrollbar-thumb { background: #0f0; border-radius: 3px; }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #333;
+            margin-bottom: 15px;
+        }
+
+        #log-list {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+            padding-right: 10px;
+        }
+
+        #log-list::-webkit-scrollbar { width: 8px; }
+        #log-list::-webkit-scrollbar-track { background: #1a1a1a; }
+        #log-list::-webkit-scrollbar-thumb { background: #0f0; border-radius: 4px; }
+        #log-list::-webkit-scrollbar-thumb:hover { background: #00ff66; }
     </style>
 </head>
 <body>
@@ -71,19 +97,6 @@
             <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
         </div>
 
-        <!-- 📜 日誌面板 (透過 /log 解鎖顯示) -->
-        <div id="admin-log-section" class="hidden" style="background: #222; color: #0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-family: monospace;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="color: #0f0; margin: 0;">📜 操作日誌 (Audit Logs)</h3>
-                <span style="font-size: 12px; color: #aaa;">
-                    🛠️ Unix 時間轉換工具連結：<a href="https://time.is/zh-tw/Unix%20time%20converter" target="_blank" style="color: #00ffff; text-decoration: underline;">time.is/zh-tw/Unix time converter</a>
-                </span>
-            </div>
-            <div id="log-list">
-                <!-- 日誌即時顯示區 -->
-            </div>
-        </div>
-        
         <hr>
         <!-- 發文區 -->
         <h3>💬 班級聊天室 / 發文區</h3>
@@ -118,7 +131,6 @@
             <h3 style="margin: 0;">💬 留言對話紀錄</h3>
         </div>
 
-        <!-- PTT 看板分類切換按鈕 -->
         <div style="margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 6px;">
             <strong style="font-size: 14px; margin-right: 5px;">📌 看板：</strong>
             <button class="btn-board active" data-board="all">全部</button>
@@ -135,6 +147,22 @@
     </div>
 </div>
 
+<!-- 📜 全螢幕/彈窗日誌面板 (獨立於視窗外) -->
+<div id="admin-log-section" class="hidden log-fullscreen-overlay">
+    <div class="log-header">
+        <h2 style="margin: 0; color: #0f0; font-size: 20px;">📜 班級系統操作日誌 (Audit Logs)</h2>
+        <div>
+            <span style="font-size: 13px; color: #aaa; margin-right: 15px;">
+                🛠️ Unix 時間轉換工具：<a href="https://time.is/zh-tw/Unix%20time%20converter" target="_blank" style="color: #00ffff; text-decoration: underline;">time.is/zh-tw/Unix time converter</a>
+            </span>
+            <button id="btn-close-log" style="background: #dc3545; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer;">❌ 退出 (/log)</button>
+        </div>
+    </div>
+    <div id="log-list">
+        <!-- 日誌即時顯示區 -->
+    </div>
+</div>
+
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
     <input type="text" id="cmd-input" placeholder="指令例: /msg 5 哈囉, /log, /chat 5, /admin, /teacher...">
@@ -145,8 +173,9 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔴 這裡請填入你的 Firebase 金鑰
-    const firebaseConfig = {
+    // 🔴 請替換為你的 Firebase 金鑰
+
+const firebaseConfig = {
   apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
   authDomain: "class-6fbf4.firebaseapp.com",
   projectId: "class-6fbf4",
@@ -154,7 +183,7 @@
   messagingSenderId: "863989862320",
   appId: "1:863989862320:web:87da48fd3d835a7775d075",
   measurementId: "G-NDMQVP76PH"
-    };
+};
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -165,6 +194,8 @@
     let roleTimer = null;
     let bannedUsers = {}; 
     let activeBoard = "all";
+    let isLogOpen = false;
+    let isLogAuthenticated = false;
 
     const boardNames = {
         gossip: '💬 閒聊',
@@ -178,7 +209,6 @@
         return `student_seat_${seat}@class52.com`;
     }
 
-    // 🕒 時間格式動態轉換器
     function parseCustomTime(timestamp) {
         if (!timestamp) return '剛剛';
         if (typeof timestamp.toDate === 'function') {
@@ -190,7 +220,6 @@
         return '剛剛';
     }
 
-    // 日誌自動紀錄
     async function logAction(actionType, detail) {
         const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "系統";
@@ -210,7 +239,7 @@
         }
     }
 
-    // 註冊功能
+    // 帳號註冊/登入/登出
     document.getElementById('btn-register').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const name = document.getElementById('real-name').value.trim();
@@ -223,14 +252,13 @@
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, formatEmail(seat), pwd);
             await updateProfile(userCredential.user, { displayName: name });
-            alert("註冊成功！已自動登入");
+            alert("註冊成功！");
             logAction("帳號註冊", `座號: ${seat} | 姓名: ${name}`);
         } catch (error) {
             alert("註冊失敗：" + error.message);
         }
     });
 
-    // 登入功能
     document.getElementById('btn-login').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const pwd = document.getElementById('password').value;
@@ -246,13 +274,11 @@
         }
     });
 
-    // 登出功能
     document.getElementById('btn-logout').addEventListener('click', () => {
         logAction("使用者登出", "登出系統");
         signOut(auth);
     });
 
-    // 監聽登入狀態
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
@@ -283,7 +309,33 @@
         });
     });
 
-    // 載入日誌
+    // 全螢幕日誌切換
+    function toggleLogWindow() {
+        const logSection = document.getElementById('admin-log-section');
+        
+        if (isLogOpen) {
+            logSection.classList.add('hidden');
+            isLogOpen = false;
+        } else {
+            if (!isLogAuthenticated) {
+                const pwd = prompt("請輸入查看日誌密碼：");
+                if (pwd === "log") {
+                    isLogAuthenticated = true;
+                } else if (pwd !== null) {
+                    alert("密碼錯誤！無法進入日誌視窗。");
+                    return;
+                } else {
+                    return;
+                }
+            }
+            logSection.classList.remove('hidden');
+            loadLogs();
+            isLogOpen = true;
+        }
+    }
+
+    document.getElementById('btn-close-log').addEventListener('click', toggleLogWindow);
+
     function loadLogs() {
         const logsRef = collection(db, "logs");
         onSnapshot(logsRef, (snapshot) => {
@@ -296,7 +348,6 @@
                 logsArray.push({ id: docSnap.id, ...docSnap.data() });
             });
 
-            // 前台手動排序
             logsArray.sort((a, b) => {
                 const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp) : 0;
                 const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp) : 0;
@@ -306,16 +357,15 @@
             logsArray.forEach((data) => {
                 const timeStr = parseCustomTime(data.timestamp);
                 const logItem = document.createElement('div');
-                logItem.style.marginBottom = '4px';
+                logItem.style.marginBottom = '6px';
                 logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${data.detail}`;
                 logList.appendChild(logItem);
             });
 
-            logList.scrollTop = 0; // 自動捲滾到頂部
+            logList.scrollTop = 0;
         });
     }
 
-    // 載入與篩選貼文
     function loadPosts() {
         filterPostsBySeat('all');
     }
@@ -335,7 +385,6 @@
                 const data = docSnap.data();
                 const docId = docSnap.id;
                 
-                // 私訊過濾
                 if (data.receiverSeat) {
                     const senderSeat = String(data.seatNumber);
                     const receiverSeat = String(data.receiverSeat);
@@ -345,11 +394,9 @@
                     if (!isSender && !isReceiver && !isAdmin) return;
                 }
 
-                // 看板過濾
                 if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
                 if (seat !== 'all' && String(data.seatNumber) !== String(seat)) return;
 
-                // 🕒 動態時間解析
                 const timeStr = parseCustomTime(data.timestamp);
                 const postDiv = document.createElement('div');
                 postDiv.className = 'post';
@@ -382,7 +429,6 @@
                 postsArea.appendChild(postDiv);
             });
 
-            // 刪除按鈕事件 bind
             document.querySelectorAll('.btn-delete').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const targetId = e.target.getAttribute('data-id');
@@ -400,7 +446,6 @@
         });
     }
 
-    // 載入作業
     function loadHomeworks() {
         const hwRef = collection(db, "homeworks");
         const q = query(hwRef, orderBy("timestamp", "desc"));
@@ -429,7 +474,7 @@
         });
     }
 
-    // 發佈貼文 (含可讀文件 ID 格式：seat_座號_毫秒)
+    // 發佈貼文
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const contentInput = document.getElementById('post-content');
         const boardSelect = document.getElementById('select-post-board');
@@ -455,7 +500,6 @@
         if (currentRole === 'teacher') displayName = "傳說中的光一老師";
 
         try {
-            // 📌 產生清晰的自訂文件 ID，例如：seat_5_1725456812000
             const customDocId = `seat_${userSeat}_${Date.now()}`;
 
             await setDoc(doc(db, "posts", customDocId), {
@@ -473,7 +517,7 @@
         }
     });
 
-    // 指令系統
+    // 指令列處理機制
     function toggleCmdBar() {
         const cmdBar = document.getElementById('cmd-bar');
         cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
@@ -499,21 +543,12 @@
         const parts = cmd.split(' ');
         const action = parts[0];
 
-        if (action === '/admin') {
+        if (action === '/log') {
+            toggleLogWindow();
+        } else if (action === '/admin') {
             const pwd = prompt("請輸入管理員密碼：");
             if (pwd === "admin123") setTemporaryRole('admin', '管理員', 10);
             else if (pwd !== null) alert("密碼錯誤！");
-        } else if (action === '/log') {
-            // 📌 輸入 /log 並驗證密碼 log 即可展開面板
-            const pwd = prompt("請輸入查看日誌密碼：");
-            if (pwd === "log") {
-                const logSection = document.getElementById('admin-log-section');
-                logSection.classList.remove('hidden');
-                loadLogs();
-                alert("日誌面板已解鎖！");
-            } else if (pwd !== null) {
-                alert("密碼錯誤！");
-            }
         } else if (action === '/teacher') {
             const pwd = prompt("請輸入光一老師認證密碼：");
             if (pwd === "teacher888") setTemporaryRole('teacher', '傳說中的光一老師', 10);
@@ -523,7 +558,6 @@
             const msgContent = parts.slice(2).join(' ').trim();
             if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
             
-            // 私訊發送
             const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
             const userSeat = seatMatch ? seatMatch[1] : "00";
             let displayName = currentUser.displayName || "同學";
