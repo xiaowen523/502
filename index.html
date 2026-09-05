@@ -317,7 +317,7 @@
         } else {
             if (!isLogAuthenticated) {
                 const pwd = prompt("請輸入查看日誌密碼：");
-                if (pwd === "log") {
+                if (pwd === "admin-log") {
                     isLogAuthenticated = true;
                 } else if (pwd !== null) {
                     alert("密碼錯誤！無法進入日誌視窗。");
