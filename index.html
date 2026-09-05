@@ -174,15 +174,14 @@
     import { getFirestore, collection, addDoc, doc, setDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 請替換為你的 Firebase 金鑰
-const firebaseConfig = {
-  apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-  authDomain: "class-6fbf4.firebaseapp.com",
-  projectId: "class-6fbf4",
-  storageBucket: "class-6fbf4.firebasestorage.app",
-  messagingSenderId: "863989862320",
-  appId: "1:863989862320:web:87da48fd3d835a7775d075",
-  measurementId: "G-NDMQVP76PH"
-};
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
