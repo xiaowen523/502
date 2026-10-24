@@ -575,17 +575,53 @@
 
         if (action === '/log') {
             toggleLogWindow();
-        } else if (action === '/point') {
-            // 快速指令加分: /point [座號] [點數] [原因]
-            modifyPoints(parts[1], parts[2], parts.slice(3).join(' '));
         } else if (action === '/admin') {
             const pwd = prompt("請輸入管理員密碼：");
             if (pwd === "admin123") setTemporaryRole('admin', '管理員', 10);
-            else alert("密碼錯誤！");
+            else if (pwd !== null) alert("密碼錯誤！");
         } else if (action === '/teacher') {
             const pwd = prompt("請輸入光一老師認證密碼：");
             if (pwd === "teacher888") setTemporaryRole('teacher', '傳說中的光一老師', 10);
-            else alert("密碼錯誤！");
+            else if (pwd !== null) alert("密碼錯誤！");
+        } else if (action === '/point') {
+            // 指令加分: /point [座號] [點數] [原因]
+            modifyPoints(parts[1], parts[2], parts.slice(3).join(' '));
+        } else if (action === '/msg') {
+            // 🔒 私訊指令：/msg [座號] [內容]
+            const targetSeat = parts[1];
+            const msgContent = parts.slice(2).join(' ').trim();
+            if (!targetSeat || !msgContent) return alert("格式錯誤！正確格式為：/msg 座號 內容");
+            
+            const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+            const userSeat = seatMatch ? seatMatch[1] : "00";
+            let displayName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
+            if (currentRole === 'admin') displayName = "管理員";
+
+            const customDocId = `msg_${userSeat}_to_${targetSeat}_${Date.now()}`;
+            setDoc(doc(db, "posts", customDocId), {
+                senderName: displayName,
+                seatNumber: userSeat,
+                receiverSeat: String(targetSeat),
+                content: msgContent,
+                timestamp: serverTimestamp()
+            }).then(() => {
+                alert(`已成功傳送私訊給 ${targetSeat} 號！`);
+                logAction("傳送私訊", `對象: ${targetSeat}號 | 內容: ${msgContent}`);
+            }).catch((err) => {
+                alert("私訊傳送失敗：" + err.message);
+            });
+        } else if (action === '/chat') {
+            const targetSeat = parts[1];
+            if (!targetSeat) alert("請輸入座號！例如: /chat 5 (或 /chat all)");
+            else filterPostsBySeat(targetSeat);
+        } else if (action === '/ban') {
+            if (currentRole !== 'admin') return alert("權限不足！只有管理員能禁言。");
+            const targetSeat = parts[1];
+            const minutes = parseInt(parts[2]);
+            if (!targetSeat || isNaN(minutes) || minutes <= 0) return alert("格式錯誤！/ban 座號 分鐘數");
+            bannedUsers[targetSeat] = Date.now() + minutes * 60 * 1000;
+            alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
+            logAction("執行禁言", `禁言座號: ${targetSeat}號 | 時間: ${minutes}分鐘`);
         } else {
             alert("未知指令");
         }
