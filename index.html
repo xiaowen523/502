@@ -19,8 +19,10 @@
         .hidden { display: none !important; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; color: white; background: #888; }
         .post { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #1a73e8; position: relative; }
+        .hw-card { background: #e8f0fe; padding: 12px; margin-bottom: 10px; border-radius: 5px; border-left: 4px solid #34a853; }
         .post-time { font-size: 0.8em; color: #777; margin-left: 10px; }
         .board-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 5px; color: #333; font-weight: bold; }
+        .doc-id-badge { font-family: monospace; font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; margin-right: 6px; }
 
         /* 🐶 寵物與商城專屬面板樣式 */
         .pet-container { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 15px; }
@@ -141,16 +143,28 @@
 
         <hr style="margin: 25px 0;">
 
-        <!-- 貼文討論區 -->
+        <!-- 📚 最新作業區 -->
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">📚 最新作業區</h3>
+            <button id="upload-hw-btn" class="hidden" style="background: #28a745; font-size: 13px;">➕ 上傳新作業</button>
+        </div>
+        <div id="homework-area" style="margin-top: 10px;">
+            <p style="color: #666; font-style: italic;">載入作業中...</p>
+        </div>
+
+        <hr style="margin: 25px 0;">
+
+        <!-- 貼文討論區 (已移除 gossip 閒聊看板) -->
         <h3>💬 班級發文留言</h3>
         <textarea id="post-content" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="說點什麼..."></textarea>
         <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
             <div>
                 發佈至看板：
                 <select id="select-post-board" style="padding: 5px; border-radius: 4px;">
-                    <option value="gossip">💬 班務/閒聊</option>
                     <option value="homework">📖 課業討論</option>
                     <option value="game">🎮 遊戲/社團</option>
+                    <option value="minecraft">⛏️ 麥塊專區</option>
+                    <option value="roblox">🤖 Roblox</option>
                     <option value="pet">🐾 寵物心得</option>
                 </select>
             </div>
@@ -160,9 +174,10 @@
         <div style="margin-top: 20px; background: #eee; padding: 8px; border-radius: 6px;">
             <strong style="font-size: 14px; margin-right: 5px;">📌 看板：</strong>
             <button class="btn-board active" data-board="all">全部</button>
-            <button class="btn-board" data-board="gossip">💬 閒聊</button>
             <button class="btn-board" data-board="homework">📖 課業</button>
             <button class="btn-board" data-board="game">🎮 遊戲</button>
+            <button class="btn-board" data-board="minecraft">⛏️ 麥塊</button>
+            <button class="btn-board" data-board="roblox">🤖 Roblox</button>
             <button class="btn-board" data-board="pet">🐾 寵物</button>
         </div>
 
@@ -186,7 +201,7 @@
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="指令例: /point 5 10 考試滿分, /log, /admin, /teacher...">
+    <input type="text" id="cmd-input" placeholder="指令例: /point 5 10 考試滿分, /delete 文章編號, /msg 5 哈囉, /log...">
 </div>
 
 <script type="module">
@@ -194,16 +209,16 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 🔴 替換為你的 Firebase 配置
-   const firebaseConfig = {
-      apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
-      authDomain: "class-6fbf4.firebaseapp.com",
-      projectId: "class-6fbf4",
-      storageBucket: "class-6fbf4.firebasestorage.app",
-      messagingSenderId: "863989862320",
-      appId: "1:863989862320:web:87da48fd3d835a7775d075",
-      measurementId: "G-NDMQVP76PH"
-    };
+    // 🔴 請替換為專案的 Firebase 配置
+const firebaseConfig = {
+  apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
+  authDomain: "class-6fbf4.firebaseapp.com",
+  projectId: "class-6fbf4",
+  storageBucket: "class-6fbf4.firebasestorage.app",
+  messagingSenderId: "863989862320",
+  appId: "1:863989862320:web:87da48fd3d835a7775d075",
+  measurementId: "G-NDMQVP76PH"
+};
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -212,6 +227,7 @@
     let currentUser = null;
     let currentRole = "student"; 
     let roleTimer = null;
+    let bannedUsers = {}; 
     let activeBoard = "all";
     let isLogOpen = false;
     let isLogAuthenticated = false;
@@ -219,6 +235,13 @@
 
     const petIcons = { dog: '🐶', cat: '🐱' };
     const equipNames = { hat: '🎩 紳士高帽', sword: '⚔️ 英雄木劍' };
+    const boardNames = {
+        homework: '📖 課業',
+        game: '🎮 遊戲',
+        minecraft: '⛏️ 麥塊',
+        roblox: '🤖 Roblox',
+        pet: '🐾 寵物'
+    };
 
     function formatEmail(seat) { return `student_seat_${seat}@class52.com`; }
 
@@ -244,11 +267,11 @@
                 timestamp: serverTimestamp()
             });
         } catch (e) {
-            console.error(e);
+            console.error("日誌寫入失敗:", e);
         }
     }
 
-    // 註冊與建立學生初始帳戶（預設點數 10 點）
+    // 帳號註冊
     document.getElementById('btn-register').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const name = document.getElementById('real-name').value.trim();
@@ -256,13 +279,12 @@
         const confirmPwd = document.getElementById('confirm-password').value;
 
         if (!seat || !name || !pwd) return alert("請填寫座號、姓名與密碼！");
-        if (pwd !== confirmPwd) return alert("密碼不一致！");
+        if (pwd !== confirmPwd) return alert("兩次輸入的密碼不一致！");
 
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, formatEmail(seat), pwd);
             await updateProfile(userCredential.user, { displayName: name });
 
-            // 初始化 Firestore 使用者資料
             await setDoc(doc(db, "users", `seat_${seat}`), {
                 seatNumber: seat,
                 name: name,
@@ -272,7 +294,7 @@
                 equipments: []
             });
 
-            alert("註冊成功！送你 10 點班級金幣與 2 份寵物飼料！");
+            alert("註冊成功！贈送 10 點班級金幣與 2 份寵物飼料！");
             logAction("帳號註冊", `座號: ${seat} | 姓名: ${name}`);
         } catch (error) {
             alert("註冊失敗：" + error.message);
@@ -284,6 +306,7 @@
         const seat = document.getElementById('seat-num').value.trim();
         const pwd = document.getElementById('password').value;
         if (!seat || !pwd) return alert("請輸入座號與密碼！");
+
         try {
             await signInWithEmailAndPassword(auth, formatEmail(seat), pwd);
             alert("登入成功！");
@@ -293,13 +316,14 @@
         }
     });
 
+    // 登出
     document.getElementById('btn-logout').addEventListener('click', () => {
         logAction("使用者登出", "登出系統");
         signOut(auth);
     });
 
-    // 監聽身分與載入寵物資料
-    onAuthStateChanged(auth, (user) => {
+    // 登入狀態監聽
+  onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
@@ -308,12 +332,34 @@
             const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
             const seat = seatMatch ? seatMatch[1] : null;
 
+            // 📌 100 號預設永久具備老師權限
             if (seat === "100") {
-                setTemporaryRole('teacher', '傳說中的光一老師', 1440);
+                currentRole = 'teacher';
+                const badge = document.getElementById('role-badge');
+                badge.innerText = '傳說中的光一老師';
+                badge.style.background = '#188038';
+
+                // 顯示加分面板與上傳作業按鈕
+                document.getElementById('teacher-point-panel').classList.remove('hidden');
+                document.getElementById('upload-hw-btn').classList.remove('hidden');
+
+                // 清除暫時身分計時器，避免被倒數重設
+                if (roleTimer) {
+                    clearTimeout(roleTimer);
+                    roleTimer = null;
+                }
+            } else {
+                currentRole = 'student';
+                const badge = document.getElementById('role-badge');
+                badge.innerText = '一般學生';
+                badge.style.background = '#888';
+                document.getElementById('teacher-point-panel').classList.add('hidden');
+                document.getElementById('upload-hw-btn').classList.add('hidden');
             }
 
             listenToUserData(seat);
             loadPosts();
+            loadHomeworks();
         } else {
             currentUser = null;
             document.getElementById('auth-section').classList.remove('hidden');
@@ -321,7 +367,7 @@
         }
     });
 
-    // 監聽學生金幣、寵物與背包狀態
+    // 實時監聽學生資料 (金幣/寵物/背包)
     function listenToUserData(seat) {
         if (!seat) return;
         const userDocRef = doc(db, "users", `seat_${seat}`);
@@ -331,13 +377,11 @@
                 document.getElementById('user-points').innerText = currentStudentData.points || 0;
                 document.getElementById('inv-food').innerText = currentStudentData.foodCount || 0;
                 
-                // 背包裝備顯示
                 const equips = currentStudentData.equipments || [];
                 document.getElementById('inv-equips').innerText = equips.length > 0 
                     ? equips.map(e => equipNames[e] || e).join(', ') 
                     : '無';
 
-                // 寵物顯示更新
                 const petBox = document.getElementById('pet-info-box');
                 const noPetBox = document.getElementById('no-pet-box');
 
@@ -359,7 +403,7 @@
         });
     }
 
-    // 🍎 老師加扣分邏輯
+    // 老師加減分
     async function modifyPoints(targetSeat, amount, reason) {
         if (currentRole !== 'teacher' && currentRole !== 'admin') {
             return alert("只有老師或管理員才能進行加減分！");
@@ -387,7 +431,7 @@
         modifyPoints(seat, amt, reason);
     });
 
-    // 🛒 商店購買邏輯
+    // 商店購買
     document.querySelectorAll('.btn-buy').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const itemType = e.target.getAttribute('data-type');
@@ -399,14 +443,14 @@
             if (!seat || !currentStudentData) return;
 
             if (currentStudentData.points < cost) {
-                return alert("班級金幣不足！請多回答問題或讓老師為你加分喔！");
+                return alert("班級金幣不足！多回答問題賺取點數吧！");
             }
 
             const userRef = doc(db, "users", `seat_${seat}`);
             const updatePayload = { points: currentStudentData.points - cost };
 
             if (itemType === 'pet') {
-                if (currentStudentData.pet) return alert("你已經領養過寵物囉！好好照顧它吧！");
+                if (currentStudentData.pet) return alert("你已經領養過寵物囉！");
                 const petName = prompt("請為你的新寵物取一個名字：") || "小萌寵";
                 updatePayload.pet = {
                     type: itemId,
@@ -428,17 +472,17 @@
         });
     });
 
-    // 🍖 餵食寵物
+    // 餵食寵物
     document.getElementById('btn-feed-pet').addEventListener('click', async () => {
         const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
         const seat = seatMatch ? seatMatch[1] : null;
         if (!seat || !currentStudentData) return;
 
         if ((currentStudentData.foodCount || 0) <= 0) {
-            return alert("背包沒有飼料了！請到福利社購買食物。");
+            return alert("背包沒有飼料了！請至商店購買。");
         }
         if (currentStudentData.pet.hunger >= 100) {
-            return alert("寵物吃得很飽囉，不需要再餵食了！");
+            return alert("寵物已經很飽了！");
         }
 
         const newHunger = Math.min(100, (currentStudentData.pet.hunger || 0) + 20);
@@ -452,79 +496,195 @@
         alert("餵食成功！飽食度增加 20%！🍖");
     });
 
-    // 發文系統
+    // 發佈貼文
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
-        const content = document.getElementById('post-content').value.trim();
-        const selectedBoard = document.getElementById('select-post-board').value;
+        const contentInput = document.getElementById('post-content');
+        const boardSelect = document.getElementById('select-post-board');
+
+        const content = contentInput ? contentInput.value.trim() : "";
+        const selectedBoard = boardSelect ? boardSelect.value : "homework";
+
         if (!content) return alert("內容不能為空！");
 
-        const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
-        const userSeat = seatMatch ? seatMatch[1] : "00";
-        const customDocId = `seat_${userSeat}_${Date.now()}`;
+        let userSeat = "00";
+        if (currentUser && currentUser.email) {
+            const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
+            if (seatMatch) userSeat = seatMatch[1];
+        }
 
-        await setDoc(doc(db, "posts", customDocId), {
-            senderName: currentUser.displayName || "同學",
-            seatNumber: userSeat,
-            board: selectedBoard,
-            content: content,
-            timestamp: serverTimestamp()
-        });
+        if (bannedUsers[userSeat] && Date.now() < bannedUsers[userSeat]) {
+            const remainingMins = Math.ceil((bannedUsers[userSeat] - Date.now()) / 60000);
+            return alert(`你已被禁言！剩餘時間：${remainingMins} 分鐘。`);
+        }
 
-        document.getElementById('post-content').value = '';
-        logAction("發佈貼文", `文章編號: ${customDocId} | 看板: ${selectedBoard} | 內容: ${content}`);
+        let displayName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
+        if (currentRole === 'admin') displayName = "管理員";
+        if (currentRole === 'teacher') displayName = "傳說中的光一老師";
+
+        try {
+            const customDocId = `seat_${userSeat}_${Date.now()}`;
+
+            await setDoc(doc(db, "posts", customDocId), {
+                senderName: displayName,
+                seatNumber: userSeat,
+                board: selectedBoard,
+                content: content,
+                timestamp: serverTimestamp()
+            });
+
+            contentInput.value = '';
+            logAction("發佈貼文", `文章編號: ${customDocId} | 看板: ${boardNames[selectedBoard] || selectedBoard} | 內容: ${content}`);
+        } catch (error) {
+            alert("發佈失敗：" + error.message);
+        }
     });
 
-    // 貼文載入
-    function loadPosts() {
-        const postsRef = collection(db, "posts");
-        const q = query(postsRef, orderBy("timestamp", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const postsArea = document.getElementById('posts-area');
-            postsArea.innerHTML = '';
-            snapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
-
-                const timeStr = parseCustomTime(data.timestamp);
-                const postDiv = document.createElement('div');
-                postDiv.className = 'post';
-                postDiv.innerHTML = `
-                    <span class="board-tag">[${data.board}]</span><strong>${data.senderName} (${data.seatNumber}號)</strong> 
-                    <span class="post-time">${timeStr}</span>
-                    <div style="margin-top: 5px;">${data.content}</div>
-                `;
-                postsArea.appendChild(postDiv);
-            });
-        });
-    }
-
-    // 看板過濾按鈕
+    // 看板切換
     document.querySelectorAll('.btn-board').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.btn-board').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             activeBoard = e.target.getAttribute('data-board');
-            loadPosts();
+            filterPostsBySeat('all');
         });
     });
+
+    // 載入貼文與文章 ID 顯示
+    function loadPosts() {
+        filterPostsBySeat('all');
+    }
+
+    function filterPostsBySeat(seat) {
+        const postsRef = collection(db, "posts");
+        const q = query(postsRef, orderBy("timestamp", "desc"));
+
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
+
+        onSnapshot(q, (snapshot) => {
+            const postsArea = document.getElementById('posts-area');
+            postsArea.innerHTML = ''; 
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const docId = docSnap.id;
+
+                if (data.receiverSeat) {
+                    const senderSeat = String(data.seatNumber);
+                    const receiverSeat = String(data.receiverSeat);
+                    const isSender = (currentUserSeat && senderSeat === currentUserSeat);
+                    const isReceiver = (currentUserSeat && receiverSeat === currentUserSeat);
+                    const isAdmin = (currentRole === 'admin');
+                    if (!isSender && !isReceiver && !isAdmin) return;
+                }
+
+                if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
+                if (seat !== 'all' && String(data.seatNumber) !== String(seat)) return;
+
+                const timeStr = parseCustomTime(data.timestamp);
+                const postDiv = document.createElement('div');
+                postDiv.className = 'post';
+
+                const isMyPost = (currentUserSeat && String(data.seatNumber) === currentUserSeat);
+                const canDelete = (currentRole === 'admin' || isMyPost);
+                
+                const deleteBtnHtml = canDelete 
+                    ? `<button class="btn-delete" data-id="${docId}" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">🗑️ 刪除</button>` 
+                    : '';
+
+                const tagHtml = data.board ? `<span class="board-tag">[${boardNames[data.board] || '一般'}]</span>` : '';
+                const idTagHtml = `<span class="doc-id-badge">#${docId}</span>`;
+
+                if (data.receiverSeat) {
+                    postDiv.style.background = '#fff3cd';
+                    postDiv.style.borderLeft = '4px solid #ffc107';
+                    postDiv.innerHTML = `
+                        ${deleteBtnHtml}
+                        ${idTagHtml}<strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px; color: #856404;">${data.content}</div>
+                    `;
+                } else {
+                    postDiv.innerHTML = `
+                        ${deleteBtnHtml}
+                        ${idTagHtml}${tagHtml}<strong>${data.senderName}</strong> <span class="post-time">${timeStr}</span><br>
+                        <div style="margin-top: 5px;">${data.content}</div>
+                    `;
+                }
+
+                postsArea.appendChild(postDiv);
+            });
+
+            document.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const targetId = e.target.getAttribute('data-id');
+                    if (confirm(`確定要刪除這條貼文嗎？\n文章編號: ${targetId}`)) {
+                        try {
+                            await deleteDoc(doc(db, "posts", targetId));
+                            alert("貼文已刪除！");
+                            logAction("刪除貼文", `刪除文章 ID: ${targetId}`);
+                        } catch (error) {
+                            alert("刪除失敗：" + error.message);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    // 載入作業
+    function loadHomeworks() {
+        const hwRef = collection(db, "homeworks");
+        const q = query(hwRef, orderBy("timestamp", "desc"));
+
+        onSnapshot(q, (snapshot) => {
+            const hwArea = document.getElementById('homework-area');
+            hwArea.innerHTML = '';
+
+            if (snapshot.empty) {
+                hwArea.innerHTML = '<p style="color: #777;">目前沒有新作業！🎉</p>';
+                return;
+            }
+
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const timeStr = parseCustomTime(data.timestamp);
+
+                const hwDiv = document.createElement('div');
+                hwDiv.className = 'hw-card';
+                hwDiv.innerHTML = `
+                    <strong>📌 ${data.title}</strong> <span class="post-time">${timeStr}</span><br>
+                    <div style="margin-top: 5px;">${data.content}</div>
+                `;
+                hwArea.appendChild(hwDiv);
+            });
+        });
+    }
 
     // 全螢幕日誌
     function toggleLogWindow() {
         const logSection = document.getElementById('admin-log-section');
+        
         if (isLogOpen) {
             logSection.classList.add('hidden');
             isLogOpen = false;
         } else {
             if (!isLogAuthenticated) {
                 const pwd = prompt("請輸入查看日誌密碼：");
-                if (pwd === "log") isLogAuthenticated = true;
-                else return alert("密碼錯誤！");
+                if (pwd === "log") {
+                    isLogAuthenticated = true;
+                } else if (pwd !== null) {
+                    alert("密碼錯誤！無法進入日誌視窗。");
+                    return;
+                } else {
+                    return;
+                }
             }
             logSection.classList.remove('hidden');
             loadLogs();
             isLogOpen = true;
         }
     }
+
     document.getElementById('btn-close-log').addEventListener('click', toggleLogWindow);
 
     function loadLogs() {
@@ -533,42 +693,56 @@
             const logList = document.getElementById('log-list');
             if (!logList) return;
             logList.innerHTML = '';
+
             let logsArray = [];
-            snapshot.forEach(docSnap => logsArray.push(docSnap.data()));
+            snapshot.forEach((docSnap) => {
+                logsArray.push({ id: docSnap.id, ...docSnap.data() });
+            });
+
             logsArray.sort((a, b) => {
-                const tA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp) : 0;
-                const tB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp) : 0;
-                return tB - tA;
+                const timeA = a.timestamp ? (a.timestamp.toMillis ? a.timestamp.toMillis() : a.timestamp) : 0;
+                const timeB = b.timestamp ? (b.timestamp.toMillis ? b.timestamp.toMillis() : b.timestamp) : 0;
+                return timeB - timeA;
             });
-            logsArray.forEach(data => {
-                const item = document.createElement('div');
-                item.style.marginBottom = '6px';
-                let detailText = (data.detail || '').replace(/(文章編號: seat_\d+_\d+)/g, '<span style="color: #00ffff; font-weight: bold;">$1</span>');
-                item.innerHTML = `<span style="color: #888;">[${parseCustomTime(data.timestamp)}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
-                logList.appendChild(item);
+
+            logsArray.forEach((data) => {
+                const timeStr = parseCustomTime(data.timestamp);
+                const logItem = document.createElement('div');
+                logItem.style.marginBottom = '6px';
+
+                let detailText = data.detail || '';
+                detailText = detailText.replace(/(文章編號: seat_\d+_\d+)/g, '<span style="color: #00ffff; font-weight: bold;">$1</span>');
+
+                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
+                logList.appendChild(logItem);
             });
+
+            logList.scrollTop = 0;
         });
     }
 
     // 指令列處理
     function toggleCmdBar() {
-        const bar = document.getElementById('cmd-bar');
-        bar.style.display = bar.style.display === 'block' ? 'none' : 'block';
-        if (bar.style.display === 'block') document.getElementById('cmd-input').focus();
+        const cmdBar = document.getElementById('cmd-bar');
+        cmdBar.style.display = (cmdBar.style.display === 'block') ? 'none' : 'block';
+        if (cmdBar.style.display === 'block') document.getElementById('cmd-input').focus();
     }
+
     document.getElementById('btn-toggle-cmd').addEventListener('click', toggleCmdBar);
+
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'z') toggleCmdBar();
     });
 
     document.getElementById('cmd-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            executeCommand(e.target.value.trim());
+            const cmd = e.target.value.trim();
             e.target.value = '';
+            executeCommand(cmd);
         }
     });
 
-    function executeCommand(cmd) {
+    async function executeCommand(cmd) {
         logAction("執行指令", `輸入: ${cmd}`);
         const parts = cmd.split(' ');
         const action = parts[0];
@@ -584,13 +758,43 @@
             if (pwd === "teacher888") setTemporaryRole('teacher', '傳說中的光一老師', 10);
             else if (pwd !== null) alert("密碼錯誤！");
         } else if (action === '/point') {
-            // 指令加分: /point [座號] [點數] [原因]
             modifyPoints(parts[1], parts[2], parts.slice(3).join(' '));
+        } else if (action === '/delete') {
+            // 🗑️ 指令刪除文章：/delete [文章編號]
+            const targetId = parts[1];
+            if (!targetId) return alert("格式錯誤！請輸入：/delete [文章編號]");
+
+            try {
+                const targetRef = doc(db, "posts", targetId);
+                const docSnap = await getDoc(targetRef);
+
+                if (!docSnap.exists()) {
+                    return alert("找不到指定的文章編號，請確認 ID 是否正確！");
+                }
+
+                const postData = docSnap.data();
+                const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+                const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
+
+                const isAuthor = (currentUserSeat && String(postData.seatNumber) === currentUserSeat);
+                const isAdmin = (currentRole === 'admin');
+
+                if (!isAdmin && !isAuthor) {
+                    return alert("權限不足！你只能刪除自己發佈的貼文（管理員可刪除任意貼文）。");
+                }
+
+                if (confirm(`確定要刪除文章【${targetId}】嗎？`)) {
+                    await deleteDoc(targetRef);
+                    alert("貼文已成功刪除！");
+                    logAction("指令刪除貼文", `刪除文章 ID: ${targetId}`);
+                }
+            } catch (error) {
+                alert("刪除失敗：" + error.message);
+            }
         } else if (action === '/msg') {
-            // 🔒 私訊指令：/msg [座號] [內容]
             const targetSeat = parts[1];
             const msgContent = parts.slice(2).join(' ').trim();
-            if (!targetSeat || !msgContent) return alert("格式錯誤！正確格式為：/msg 座號 內容");
+            if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
             
             const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
             const userSeat = seatMatch ? seatMatch[1] : "00";
@@ -605,14 +809,14 @@
                 content: msgContent,
                 timestamp: serverTimestamp()
             }).then(() => {
-                alert(`已成功傳送私訊給 ${targetSeat} 號！`);
+                alert(`已傳送私訊給 ${targetSeat} 號！`);
                 logAction("傳送私訊", `對象: ${targetSeat}號 | 內容: ${msgContent}`);
             }).catch((err) => {
                 alert("私訊傳送失敗：" + err.message);
             });
         } else if (action === '/chat') {
             const targetSeat = parts[1];
-            if (!targetSeat) alert("請輸入座號！例如: /chat 5 (或 /chat all)");
+            if (!targetSeat) alert("請輸入座號！/chat 座號 (或 /chat all)");
             else filterPostsBySeat(targetSeat);
         } else if (action === '/ban') {
             if (currentRole !== 'admin') return alert("權限不足！只有管理員能禁言。");
@@ -633,8 +837,8 @@
         badge.innerText = displayName;
         badge.style.background = (role === 'admin') ? '#d93025' : '#188038';
 
-        // 顯示老師專屬加分面板
         document.getElementById('teacher-point-panel').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
+        document.getElementById('upload-hw-btn').classList.toggle('hidden', role !== 'teacher' && role !== 'admin');
         alert(`已切換至【${displayName}】模式！`);
 
         if (roleTimer) clearTimeout(roleTimer);
@@ -643,6 +847,7 @@
             badge.innerText = '一般學生';
             badge.style.background = '#888';
             document.getElementById('teacher-point-panel').classList.add('hidden');
+            document.getElementById('upload-hw-btn').classList.add('hidden');
             alert('權限已恢復為一般學生狀態。');
         }, minutes * 60 * 1000);
     }
