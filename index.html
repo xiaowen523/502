@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -64,11 +63,11 @@
         </div>
     </div>
     
-    <!-- 1. 註冊 / 登入區塊 -->
+    <!-- 1. 註冊 / 登入區塊 (座號改為文字輸入) -->
     <div id="auth-section">
         <h3>註冊 / 登入</h3>
         <div class="form-group">
-            <input type="number" id="seat-num" placeholder="座號 (老師請輸入 100，管理員請輸入 502)">
+            <input type="text" id="seat-num" placeholder="座號/帳號 (老師: 100，管理員: 502)">
         </div>
         <div class="form-group">
             <input type="text" id="real-name" placeholder="真實姓名 (僅註冊需填)">
@@ -121,11 +120,11 @@
             </div>
         </div>
 
-        <!-- 老師/管理員加分控制面板 -->
+        <!-- 老師/管理員加分控制面板 (座號改為文字輸入) -->
         <div id="teacher-point-panel" class="hidden" style="background: #e8f5e9; border: 1px solid #81c784; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
             <h3 style="margin-top: 0; color: #2e7d32;">👩‍🏫 班級加減分管理</h3>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <input type="number" id="point-target-seat" placeholder="學生座號" style="width: 100px;">
+                <input type="text" id="point-target-seat" placeholder="學生座號" style="width: 120px;">
                 <input type="number" id="point-amount" placeholder="加減點數 (例如: 10 或 -5)" style="width: 160px;">
                 <input type="text" id="point-reason" placeholder="加分原因 (例如: 作業全對)" style="width: 200px;">
                 <button id="btn-give-points" style="background: #2e7d32;">發送獎勵點數</button>
@@ -249,7 +248,7 @@
     import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 請替換為專案的 Firebase 配置
-   const firebaseConfig = {
+    const firebaseConfig = {
       apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
       authDomain: "class-6fbf4.firebaseapp.com",
       projectId: "class-6fbf4",
@@ -258,7 +257,6 @@
       appId: "1:863989862320:web:87da48fd3d835a7775d075",
       measurementId: "G-NDMQVP76PH"
     };
-
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -281,6 +279,7 @@
         pet: '🐾 寵物'
     };
 
+    // 格式化自訂 Email，不限定純數字
     function formatEmail(seat) { return `student_seat_${seat}@class52.com`; }
 
     function parseCustomTime(timestamp) {
@@ -291,7 +290,7 @@
     }
 
     async function logAction(actionType, detail) {
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
         const userSeat = seatMatch ? seatMatch[1] : "系統";
         const userName = currentUser ? (currentUser.displayName || "同學") : "未登入";
 
@@ -309,7 +308,7 @@
         }
     }
 
-    // 帳號註冊
+    // 帳號註冊 (允許字串座號)
     document.getElementById('btn-register').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const name = document.getElementById('real-name').value.trim();
@@ -361,17 +360,16 @@
         signOut(auth);
     });
 
-    // 登入狀態監聽（502號預設管理員、100號預設教師、自訂管理員同步）
+    // 登入狀態監聽
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
 
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
             const seat = seatMatch ? seatMatch[1] : null;
 
-            // 檢查是否為管理員（502 號或資料庫設定為管理員）
             let isAdmin = (seat === "502");
             if (!isAdmin && seat) {
                 try {
@@ -470,7 +468,7 @@
     async function sendMail(targetSeat, title, content) {
         if (!targetSeat || !title || !content) return alert("請填寫收件座號、主旨與內容！");
 
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
         const senderSeat = seatMatch ? seatMatch[1] : "00";
         let senderName = currentUser ? (currentUser.displayName || "同學") : "訪客";
         if (currentRole === 'teacher') senderName = "光一老師";
@@ -491,7 +489,7 @@
                 timestamp: serverTimestamp()
             });
 
-            alert(`信件已成功寄送至 ${targetSeat === 'all' ? '全班' : targetSeat + ' 號'}！`);
+            alert(`信件已成功寄送至 ${targetSeat === 'all' ? '全班' : targetSeat}！`);
             document.getElementById('mail-receiver').value = '';
             document.getElementById('mail-title').value = '';
             document.getElementById('mail-content').value = '';
@@ -539,7 +537,7 @@
                         <span style="font-size: 11px; color: #777;">${timeStr}</span>
                     </div>
                     <div style="font-size: 12px; color: #555; margin-bottom: 5px;">
-                        寄件人：<strong>${data.senderName} (${data.senderSeat}號)</strong> ➔ 收件人：<strong>${data.receiverSeat === 'all' ? '📢 全班' : data.receiverSeat + '號'}</strong>
+                        寄件人：<strong>${data.senderName} (${data.senderSeat})</strong> ➔ 收件人：<strong>${data.receiverSeat === 'all' ? '📢 全班' : data.receiverSeat}</strong>
                     </div>
                     <div style="font-size: 13px; color: #222; white-space: pre-wrap; background: #fafafa; padding: 6px; border-radius: 4px;">${data.content}</div>
                 `;
@@ -564,14 +562,14 @@
         const targetSnap = await getDoc(targetRef);
 
         if (!targetSnap.exists()) {
-            return alert(`找不到座號 ${targetSeat} 號的學生資料！`);
+            return alert(`找不到座號/帳號 ${targetSeat} 的資料！`);
         }
 
         const newPoints = (targetSnap.data().points || 0) + parseInt(amount);
         await updateDoc(targetRef, { points: newPoints });
 
-        alert(`已成功為 ${targetSeat} 號調整點數 (${amount > 0 ? '+' : ''}${amount})！目前點數：${newPoints}`);
-        logAction("點數異動", `對象: ${targetSeat}號 | 變動: ${amount} 點 | 原因: ${reason || '無'} | 調整後: ${newPoints} 點`);
+        alert(`已成功為 ${targetSeat} 調整點數 (${amount > 0 ? '+' : ''}${amount})！目前點數：${newPoints}`);
+        logAction("點數異動", `對象: ${targetSeat} | 變動: ${amount} 點 | 原因: ${reason || '無'} | 調整後: ${newPoints} 點`);
     }
 
     document.getElementById('btn-give-points').addEventListener('click', () => {
@@ -588,7 +586,7 @@
             const itemId = e.target.getAttribute('data-item');
             const cost = parseInt(e.target.getAttribute('data-cost'));
 
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
             const seat = seatMatch ? seatMatch[1] : null;
             if (!seat || !currentStudentData) return;
 
@@ -624,7 +622,7 @@
 
     // 餵食寵物
     document.getElementById('btn-feed-pet').addEventListener('click', async () => {
-        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
         const seat = seatMatch ? seatMatch[1] : null;
         if (!seat || !currentStudentData) return;
 
@@ -658,7 +656,7 @@
 
         let userSeat = "00";
         if (currentUser && currentUser.email) {
-            const seatMatch = currentUser.email.match(/student_seat_(\d+)@/);
+            const seatMatch = currentUser.email.match(/student_seat_([^@]+)@/);
             if (seatMatch) userSeat = seatMatch[1];
         }
 
@@ -708,7 +706,7 @@
         const postsRef = collection(db, "posts");
         const q = query(postsRef, orderBy("timestamp", "desc"));
 
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
         const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
 
         onSnapshot(q, (snapshot) => {
@@ -720,7 +718,6 @@
                 postItems.push({ id: docSnap.id, ...docSnap.data() });
             });
 
-            // 排序：置頂優先 (isPinned)，其餘依發文時間倒序
             postItems.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -764,7 +761,7 @@
                     postDiv.style.borderLeft = '4px solid #ffc107';
                     postDiv.innerHTML = `
                         ${deleteBtnHtml}
-                        ${pinnedHtml}${idTagHtml}<strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat} 號]</i> <span class="post-time">${timeStr}</span><br>
+                        ${pinnedHtml}${idTagHtml}<strong>${data.senderName}</strong> 🔒 <i>[私訊給 ${data.receiverSeat}]</i> <span class="post-time">${timeStr}</span><br>
                         <div style="margin-top: 5px; color: #856404;">${data.content}</div>
                     `;
                 } else {
@@ -823,7 +820,7 @@
         });
     }
 
-    // 全螢幕日誌（免密碼：僅限老師與管理員）
+    // 全螢幕日誌
     function toggleLogWindow() {
         if (currentRole !== 'admin' && currentRole !== 'teacher') {
             return alert("權限不足！只有老師與管理員可以使用 /log 查看日誌。");
@@ -866,9 +863,9 @@
                 logItem.style.marginBottom = '6px';
 
                 let detailText = data.detail || '';
-                detailText = detailText.replace(/(文章編號: seat_\d+_\d+)/g, '<span style="color: #00ffff; font-weight: bold;">$1</span>');
+                detailText = detailText.replace(/(文章編號: seat_[^_\s]+_\d+)/g, '<span style="color: #00ffff; font-weight: bold;">$1</span>');
 
-                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}號(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
+                logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
                 logList.appendChild(logItem);
             });
 
@@ -902,11 +899,9 @@
         const parts = cmd.split(' ');
         const action = parts[0];
 
-        // 📜 /log 指令：無密碼，僅限老師與管理員使用
         if (action === '/log') {
             toggleLogWindow();
         } 
-        // 👑 /admin 指令：管理權限管理（僅管理員可新增/移除）
         else if (action === '/admin') {
             if (currentRole !== 'admin') {
                 return alert("權限不足！只有管理員可操作 /admin。");
@@ -919,26 +914,26 @@
                 try {
                     const userRef = doc(db, "users", `seat_${targetSeat}`);
                     const userSnap = await getDoc(userRef);
-                    if (!userSnap.exists()) return alert(`找不到座號 ${targetSeat} 號的帳號！`);
+                    if (!userSnap.exists()) return alert(`找不到座號/帳號 ${targetSeat}！`);
 
                     await updateDoc(userRef, { isAdmin: true });
-                    alert(`已成功授權 ${targetSeat} 號為管理員！`);
-                    logAction("管理員授權", `新增管理員: ${targetSeat}號`);
+                    alert(`已成功授權 ${targetSeat} 為管理員！`);
+                    logAction("管理員授權", `新增管理員: ${targetSeat}`);
                 } catch (e) {
                     alert("授權失敗：" + e.message);
                 }
             } else if (subAction === 'remove') {
                 if (!targetSeat) return alert("格式錯誤！正確格式為：/admin remove 座號");
-                if (targetSeat === "502") return alert("無法移除預設管理員（502號）的權限！");
+                if (targetSeat === "502") return alert("無法移除預設管理員（502）的權限！");
 
                 try {
                     const userRef = doc(db, "users", `seat_${targetSeat}`);
                     const userSnap = await getDoc(userRef);
-                    if (!userSnap.exists()) return alert(`找不到座號 ${targetSeat} 號的帳號！`);
+                    if (!userSnap.exists()) return alert(`找不到座號/帳號 ${targetSeat}！`);
 
                     await updateDoc(userRef, { isAdmin: false });
-                    alert(`已成功移除 ${targetSeat} 號的管理員權限！`);
-                    logAction("移除管理員", `移除管理員: ${targetSeat}號`);
+                    alert(`已成功移除 ${targetSeat} 的管理員權限！`);
+                    logAction("移除管理員", `移除管理員: ${targetSeat}`);
                 } catch (e) {
                     alert("操作失敗：" + e.message);
                 }
@@ -946,7 +941,6 @@
                 alert("指令格式錯誤！請使用：/admin add 座號 或 /admin remove 座號");
             }
         } 
-        // 📌 /head 指令：管理員將貼文置頂或取消置頂
         else if (action === '/head') {
             if (currentRole !== 'admin') {
                 return alert("權限不足！只有管理員可將文章置頂。");
@@ -972,11 +966,9 @@
                 alert("操作失敗：" + e.message);
             }
         } 
-        // 點數異動
         else if (action === '/point') {
             modifyPoints(parts[1], parts[2], parts.slice(3).join(' '));
         } 
-        // 信箱
         else if (action === '/mail') {
             if (parts.length === 1) {
                 document.getElementById('mail-section').classList.toggle('hidden');
@@ -987,7 +979,6 @@
                 sendMail(targetSeat, title, content);
             }
         } 
-        // 刪除文章
         else if (action === '/delete') {
             const targetId = parts[1];
             if (!targetId) return alert("格式錯誤！請輸入：/delete [文章編號]");
@@ -1001,7 +992,7 @@
                 }
 
                 const postData = docSnap.data();
-                const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+                const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
                 const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
 
                 const isAuthor = (currentUserSeat && String(postData.seatNumber) === currentUserSeat);
@@ -1020,13 +1011,12 @@
                 alert("刪除失敗：" + error.message);
             }
         } 
-        // 私訊
         else if (action === '/msg') {
             const targetSeat = parts[1];
             const msgContent = parts.slice(2).join(' ').trim();
             if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
             
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
+            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
             const userSeat = seatMatch ? seatMatch[1] : "00";
             let displayName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
             if (currentRole === 'admin') displayName = "管理員";
@@ -1040,28 +1030,27 @@
                 isPinned: false,
                 timestamp: serverTimestamp()
             }).then(() => {
-                alert(`已傳送私訊給 ${targetSeat} 號！`);
-                logAction("傳送私訊", `對象: ${targetSeat}號 | 內容: ${msgContent}`);
+                alert(`已傳送私訊給 ${targetSeat}！`);
+                logAction("傳送私訊", `對象: ${targetSeat} | 內容: ${msgContent}`);
             }).catch((err) => {
                 alert("私訊傳送失敗：" + err.message);
             });
         } 
-        // 篩選聊天室
         else if (action === '/chat') {
             const targetSeat = parts[1];
             if (!targetSeat) alert("請輸入座號！/chat 座號 (或 /chat all)");
             else filterPostsBySeat(targetSeat);
         } 
-        // 禁言
         else if (action === '/ban') {
             if (currentRole !== 'admin') return alert("權限不足！只有管理員能禁言。");
             const targetSeat = parts[1];
             const minutes = parseInt(parts[2]);
             if (!targetSeat || isNaN(minutes) || minutes <= 0) return alert("格式錯誤！/ban 座號 分鐘數");
             bannedUsers[targetSeat] = Date.now() + minutes * 60 * 1000;
-            alert(`已成功禁言座號 【${targetSeat}】 號 ${minutes} 分鐘！`);
-            logAction("執行禁言", `禁言座號: ${targetSeat}號 | 時間: ${minutes}分鐘`);
-        } else {
+            alert(`已成功禁言座號 【${targetSeat}】 ${minutes} 分鐘！`);
+            logAction("執行禁言", `禁言座號: ${targetSeat} | 時間: ${minutes}分鐘`);
+        } 
+        else {
             alert("未知指令");
         }
     }
