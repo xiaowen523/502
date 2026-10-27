@@ -246,6 +246,32 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    // 📚 管理員 / 老師上傳新作業事件
+    document.getElementById('upload-hw-btn').addEventListener('click', async () => {
+        if (currentRole !== 'admin' && currentRole !== 'teacher') {
+            return alert("只有管理員或老師可以發佈作業！");
+        }
+
+        const title = prompt("請輸入作業標題（例如：數學習作第 24-25 頁）：");
+        if (!title || !title.trim()) return;
+
+        const content = prompt("請輸入作業詳細內容（例如：明日早自習前由學藝股長收齊）：");
+        if (!content || !content.trim()) return;
+
+        try {
+            const hwId = `hw_${Date.now()}`;
+            await setDoc(doc(db, "homeworks", hwId), {
+                title: title.trim(),
+                content: content.trim(),
+                timestamp: serverTimestamp()
+            });
+
+            alert("作業已成功發佈！");
+            logAction("發佈作業", `標題: ${title.trim()} | 內容: ${content.trim()}`);
+        } catch (error) {
+            alert("作業發佈失敗：" + error.message);
+        }
+    });
 
     // 🔴 請替換為專案的 Firebase 配置
     const firebaseConfig = {
