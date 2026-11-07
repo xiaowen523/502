@@ -318,8 +318,8 @@ const firebaseConfig = {
     }
 
     async function logAction(actionType, detail) {
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-        const userSeat = seatMatch ? seatMatch[1] : "系統";
+    const seatMatch = (currentUser && currentUser.email) ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
+    const userSeat = seatMatch ? seatMatch[1] : "系統";
         const userName = currentUser ? (currentUser.displayName || "同學") : "未登入";
 
         try {
