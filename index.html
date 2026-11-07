@@ -395,8 +395,8 @@ const firebaseConfig = {
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
 
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-            const seat = seatMatch ? seatMatch[1].trim() : null;
+    const seatMatch = (currentUser && currentUser.email) ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
+    const seat = seatMatch ? seatMatch[1].trim() : null;
 
             // 1. 檢查硬編碼名單
             let isAdmin = HARDCODED_ADMINS.includes(seat);
