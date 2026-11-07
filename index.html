@@ -323,29 +323,64 @@
     });
 
     // 登入狀態監聽
-    onAuthStateChanged(auth, (user) => {
+   onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
 
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_(\d+)@/) : null;
-            const seat = seatMatch ? seatMatch[1] : null;
+            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
+            // 去除空白確保比對完全精準
+            const seat = seatMatch ? seatMatch[1].trim() : null;
 
-            if (seat === "100") {
-                setTemporaryRole('teacher', '傳說中的光一老師', 1440);
+            // 👑 502 號絕對強制判定為管理員
+            let isAdmin = (seat === "502");
+
+            // 如果不是 502，再查詢資料庫是否被授權過
+            if (!isAdmin && seat) {
+                try {
+                    const userSnap = await getDoc(doc(db, "users", `seat_${seat}`));
+                    if (userSnap.exists() && userSnap.data().isAdmin === true) {
+                        isAdmin = true;
+                    }
+                } catch (e) {
+                    console.error("讀取權限失敗:", e);
+                }
+            }
+
+            const badge = document.getElementById('role-badge');
+
+            if (isAdmin) {
+                currentRole = 'admin';
+                badge.innerText = '管理員';
+                badge.style.background = '#d93025';
+                document.getElementById('teacher-point-panel').classList.remove('hidden');
+                document.getElementById('upload-hw-btn').classList.remove('hidden');
+            } else if (seat === "100") {
+                currentRole = 'teacher';
+                badge.innerText = '傳說中的光一老師';
+                badge.style.background = '#188038';
+                document.getElementById('teacher-point-panel').classList.remove('hidden');
+                document.getElementById('upload-hw-btn').classList.remove('hidden');
+            } else {
+                currentRole = 'student';
+                badge.innerText = '一般學生';
+                badge.style.background = '#888';
+                document.getElementById('teacher-point-panel').classList.add('hidden');
+                document.getElementById('upload-hw-btn').classList.add('hidden');
             }
 
             listenToUserData(seat);
             loadPosts();
             loadHomeworks();
+            loadMails(seat);
         } else {
             currentUser = null;
+            currentRole = 'student';
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('main-section').classList.add('hidden');
         }
     });
-
     // 實時監聽學生資料 (金幣/寵物/背包)
     function listenToUserData(seat) {
         if (!seat) return;
