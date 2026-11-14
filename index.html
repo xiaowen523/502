@@ -95,14 +95,14 @@
             <button id="btn-logout" style="float: right; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">登出</button>
         </div>
 
-        <!-- ⚖️ 審訊室橫幅面板（開啟時顯示給管理員及被審訊學生） -->
+        <!-- ⚖️ 審訊室橫幅面板 -->
         <div id="interrogation-panel" class="interrogation-box hidden">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin: 0; color: #ffeb3b;">⚖️ 班級審訊室（自白專區）</h3>
                 <span id="interrogation-status" style="font-size: 13px; font-weight: bold; background: #4527a0; padding: 3px 8px; border-radius: 4px;">審訊對象：無</span>
             </div>
             <p style="font-size: 13px; margin: 8px 0; color: #d1c4e9;">
-                此處為違規自白與審查空間。被指定學生即使處於禁言狀態，仍可在下方選擇「⚖️ 審訊室」看板陳述自白與說明理由；一般學生無法查看。
+                此處為違規自白與審查空間。被指定學生即使處於禁言狀態，仍可在下方選擇「⚖️ 審訊室自白」看板陳述自白與說明理由；一般學生無法查看。
             </p>
             <div id="interrogation-admin-ctrl" class="hidden" style="margin-top: 6px;">
                 <button id="btn-quick-close-interrogation" style="background: #e91e63; font-size: 12px; padding: 4px 10px;">關閉審訊室 (/interrogate close)</button>
@@ -221,7 +221,6 @@
                     <option value="minecraft">⛏️ 麥塊專區</option>
                     <option value="roblox">🤖 Roblox</option>
                     <option value="pet">🐾 寵物心得</option>
-                    <!-- 管理員專用與審訊室選項 -->
                     <option value="admin" id="opt-board-admin" class="hidden" style="color: #d93025; font-weight: bold;">🔒 管理員專屬看板</option>
                     <option value="interrogate" id="opt-board-interrogate" class="hidden" style="color: #673ab7; font-weight: bold;">⚖️ 審訊室自白</option>
                 </select>
@@ -237,7 +236,6 @@
             <button class="btn-board" data-board="minecraft">⛏️ 麥塊</button>
             <button class="btn-board" data-board="roblox">🤖 Roblox</button>
             <button class="btn-board" data-board="pet">🐾 寵物</button>
-            <!-- 管理員專用與審訊室篩選按鈕 -->
             <button class="btn-board hidden" id="btn-board-admin" data-board="admin" style="background: #c62828;">🔒 管理專區</button>
             <button class="btn-board hidden" id="btn-board-interrogate" data-board="interrogate" style="background: #4527a0;">⚖️ 審訊室</button>
         </div>
@@ -271,7 +269,7 @@
     import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 請替換為專案的 Firebase 配置
-const firebaseConfig = {
+    const firebaseConfig = {
   apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
   authDomain: "class-6fbf4.firebaseapp.com",
   projectId: "class-6fbf4",
@@ -281,12 +279,10 @@ const firebaseConfig = {
   measurementId: "G-NDMQVP76PH"
 };
 
-
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // 👑 程式碼內建硬編碼管理員清單
     const HARDCODED_ADMINS = ["502"];
 
     let currentUser = null;
@@ -308,7 +304,15 @@ const firebaseConfig = {
         interrogate: '⚖️ 審訊室自白'
     };
 
-    function formatEmail(seat) { return `student_seat_${seat}@class52.com`; }
+    function formatEmail(seat) {
+        return `student_seat_${seat}@class52.com`;
+    }
+
+    function getSeatFromUser(user) {
+        if (!user || !user.email) return null;
+        const match = user.email.match(/student_seat_([^@]+)@/);
+        return match ? match[1].trim() : null;
+    }
 
     function parseCustomTime(timestamp) {
         if (!timestamp) return '剛剛';
@@ -318,9 +322,8 @@ const firebaseConfig = {
     }
 
     async function logAction(actionType, detail) {
-    const seatMatch = (currentUser && currentUser.email) ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
-    const userSeat = seatMatch ? seatMatch[1] : "系統";
-        const userName = currentUser ? (currentUser.displayName || "同學") : "未登入";
+        const userSeat = getSeatFromUser(currentUser) || "系統";
+        const userName = (currentUser && currentUser.displayName) ? currentUser.displayName : "未登入";
 
         try {
             await addDoc(collection(db, "logs"), {
@@ -395,21 +398,14 @@ const firebaseConfig = {
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
 
-    const seatMatch = (currentUser && currentUser.email) ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
-    const seat = seatMatch ? seatMatch[1].trim() : null;
-
-            // 1. 檢查硬編碼名單
+            const seat = getSeatFromUser(currentUser);
             let isAdmin = HARDCODED_ADMINS.includes(seat);
 
-            // 2. 檢查資料庫 users/seat_XX 之 isAdmin 欄位
             if (!isAdmin && seat) {
                 try {
                     const userSnap = await getDoc(doc(db, "users", `seat_${seat}`));
-                    if (userSnap.exists()) {
-                        const uData = userSnap.data();
-                        if (uData.isAdmin === true) {
-                            isAdmin = true;
-                        }
+                    if (userSnap.exists() && userSnap.data().isAdmin === true) {
+                        isAdmin = true;
                     }
                 } catch (e) {
                     console.error("讀取使用者管理員權限失敗:", e);
@@ -418,15 +414,12 @@ const firebaseConfig = {
 
             const badge = document.getElementById('role-badge');
 
-            // 角色分配
             if (isAdmin) {
                 currentRole = 'admin';
                 badge.innerText = '管理員';
                 badge.style.background = '#d93025';
                 document.getElementById('teacher-point-panel').classList.remove('hidden');
                 document.getElementById('upload-hw-btn').classList.remove('hidden');
-                
-                // 顯示管理員專屬看板與選項
                 document.getElementById('opt-board-admin').classList.remove('hidden');
                 document.getElementById('btn-board-admin').classList.remove('hidden');
             } else if (seat === "100") {
@@ -435,7 +428,6 @@ const firebaseConfig = {
                 badge.style.background = '#188038';
                 document.getElementById('teacher-point-panel').classList.remove('hidden');
                 document.getElementById('upload-hw-btn').classList.remove('hidden');
-
                 document.getElementById('opt-board-admin').classList.add('hidden');
                 document.getElementById('btn-board-admin').classList.add('hidden');
             } else {
@@ -444,7 +436,6 @@ const firebaseConfig = {
                 badge.style.background = '#888';
                 document.getElementById('teacher-point-panel').classList.add('hidden');
                 document.getElementById('upload-hw-btn').classList.add('hidden');
-
                 document.getElementById('opt-board-admin').classList.add('hidden');
                 document.getElementById('btn-board-admin').classList.add('hidden');
             }
@@ -462,7 +453,7 @@ const firebaseConfig = {
         }
     });
 
-    // ⚖️ 實時監聽審訊室開放狀態
+    // 實時監聽審訊室狀態
     function listenToInterrogationRoom(mySeat) {
         const docRef = doc(db, "settings", "interrogation");
         onSnapshot(docRef, (snap) => {
@@ -477,7 +468,6 @@ const firebaseConfig = {
                 const isTarget = (String(mySeat) === String(interrogationState.targetSeat));
                 const isAdmin = (currentRole === 'admin');
 
-                // 只有管理員或被審訊當事人看得到審訊室橫幅與看板選項
                 if (isAdmin || isTarget) {
                     panel.classList.remove('hidden');
                     optInterrogate.classList.remove('hidden');
@@ -498,7 +488,6 @@ const firebaseConfig = {
         });
     }
 
-    // 審訊室管理員快捷關閉按鈕
     document.getElementById('btn-quick-close-interrogation').addEventListener('click', async () => {
         if (currentRole !== 'admin') return;
         try {
@@ -546,7 +535,7 @@ const firebaseConfig = {
         });
     }
 
-    // ✉️ 信箱功能
+    // 信箱功能
     document.getElementById('btn-toggle-mail').addEventListener('click', () => {
         document.getElementById('mail-section').classList.toggle('hidden');
     });
@@ -562,9 +551,8 @@ const firebaseConfig = {
     async function sendMail(targetSeat, title, content) {
         if (!targetSeat || !title || !content) return alert("請填寫收件座號、主旨與內容！");
 
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
-        const senderSeat = seatMatch ? seatMatch[1] : "00";
-        let senderName = currentUser ? (currentUser.displayName || "同學") : "訪客";
+        const senderSeat = getSeatFromUser(currentUser) || "00";
+        let senderName = (currentUser && currentUser.displayName) ? currentUser.displayName : "訪客";
         if (currentRole === 'teacher') senderName = "光一老師";
         if (currentRole === 'admin') senderName = "管理員";
 
@@ -645,7 +633,7 @@ const firebaseConfig = {
         });
     }
 
-    // 📚 管理員 / 老師上傳新作業
+    // 上傳新作業
     document.getElementById('upload-hw-btn').addEventListener('click', async () => {
         if (currentRole !== 'admin' && currentRole !== 'teacher') {
             return alert("只有管理員或老師可以發佈作業！");
@@ -672,7 +660,6 @@ const firebaseConfig = {
         }
     });
 
-    // 載入作業
     function loadHomeworks() {
         const hwRef = collection(db, "homeworks");
         const q = query(hwRef, orderBy("timestamp", "desc"));
@@ -736,8 +723,7 @@ const firebaseConfig = {
             const itemId = e.target.getAttribute('data-item');
             const cost = parseInt(e.target.getAttribute('data-cost'));
 
-            const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-            const seat = seatMatch ? seatMatch[1] : null;
+            const seat = getSeatFromUser(currentUser);
             if (!seat || !currentStudentData) return;
 
             if (currentStudentData.points < cost) {
@@ -772,8 +758,7 @@ const firebaseConfig = {
 
     // 餵食寵物
     document.getElementById('btn-feed-pet').addEventListener('click', async () => {
-        const seatMatch = currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/) : null;
-        const seat = seatMatch ? seatMatch[1] : null;
+        const seat = getSeatFromUser(currentUser);
         if (!seat || !currentStudentData) return;
 
         if ((currentStudentData.foodCount || 0) <= 0) {
@@ -794,7 +779,7 @@ const firebaseConfig = {
         alert("餵食成功！飽食度增加 20%！🍖");
     });
 
-// 發佈貼文 (包含全域禁言檢查與審訊室放行邏輯)
+    // 發佈貼文
     document.getElementById('btn-submit-post').addEventListener('click', async () => {
         const contentInput = document.getElementById('post-content');
         const boardSelect = document.getElementById('select-post-board');
@@ -804,18 +789,12 @@ const firebaseConfig = {
 
         if (!content) return alert("內容不能為空！");
 
-        let userSeat = "00";
-        if (currentUser && currentUser.email) {
-            const seatMatch = currentUser.email.match(/student_seat_([^@]+)@/);
-            if (seatMatch) userSeat = seatMatch[1];
-        }
+        const userSeat = getSeatFromUser(currentUser) || "00";
 
-        // 🔒 檢查權限：只有管理員能發佈至 admin 看板
         if (selectedBoard === 'admin' && currentRole !== 'admin') {
             return alert("權限不足！只有管理員可以發布至管理員專屬看板。");
         }
 
-        // 🔒 檢查權限：只有管理員或被審訊的學生能發佈至 interrogate 看板
         if (selectedBoard === 'interrogate') {
             const isTarget = (interrogationState.isOpen && String(userSeat) === String(interrogationState.targetSeat));
             if (currentRole !== 'admin' && !isTarget) {
@@ -823,7 +802,7 @@ const firebaseConfig = {
             }
         }
 
-        // 🔒 檢查全域禁言狀態（審訊室看板為自白專用，豁免禁言限制）
+        // 檢查全域禁言狀態（審訊室豁免禁言限制）
         if (selectedBoard !== 'interrogate') {
             try {
                 const userSnap = await getDoc(doc(db, "users", `seat_${userSeat}`));
@@ -839,18 +818,14 @@ const firebaseConfig = {
             }
         }
 
-        // ─── 👑 管理員發文模式詢問 ───
-        // 取得該學生註冊時的真實姓名
         const realStudentName = (currentUser && currentUser.displayName) ? currentUser.displayName : "同學";
         let displayName = realStudentName;
 
         if (currentRole === 'admin') {
-            // 如果是管理員專屬看板，強制使用管理員名義
             if (selectedBoard === 'admin') {
                 displayName = "管理員";
             } else {
-                // 一般看板發文前詢問是否切換為管理員模式
-                const useAdminMode = confirm("您具備管理員身分！\n\n【確定】：以「管理員」名義發布\n【取消】：以原本姓名（" + realStudentName + "）發布");
+                const useAdminMode = confirm(`您具備管理員身分！\n\n【確定】：以「管理員」名義發布\n【取消】：以原本姓名（${realStudentName}）發布`);
                 displayName = useAdminMode ? "管理員" : realStudentName;
             }
         } else if (currentRole === 'teacher') {
@@ -875,6 +850,7 @@ const firebaseConfig = {
             alert("發佈失敗：" + error.message);
         }
     });
+
     // 看板切換
     document.querySelectorAll('.btn-board').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -892,9 +868,7 @@ const firebaseConfig = {
     function filterPostsBySeat(seat) {
         const postsRef = collection(db, "posts");
         const q = query(postsRef, orderBy("timestamp", "desc"));
-
-        const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-        const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
+        const currentUserSeat = getSeatFromUser(currentUser);
 
         onSnapshot(q, (snapshot) => {
             const postsArea = document.getElementById('posts-area');
@@ -916,7 +890,6 @@ const firebaseConfig = {
             postItems.forEach((data) => {
                 const docId = data.id;
 
-                // 1. 私訊過濾
                 if (data.receiverSeat) {
                     const senderSeat = String(data.seatNumber);
                     const receiverSeat = String(data.receiverSeat);
@@ -926,18 +899,15 @@ const firebaseConfig = {
                     if (!isSender && !isReceiver && !isAdmin) return;
                 }
 
-                // 2. 🔒 管理員看板過濾：只有管理員看得到
                 if (data.board === 'admin' && currentRole !== 'admin') {
                     return;
                 }
 
-                // 3. ⚖️ 審訊室過濾：只有管理員與被審訊學生看得到
                 if (data.board === 'interrogate') {
                     const isTarget = (interrogationState.isOpen && String(currentUserSeat) === String(interrogationState.targetSeat));
                     if (currentRole !== 'admin' && !isTarget) return;
                 }
 
-                // 4. 看板與座號篩選
                 if (activeBoard !== 'all' && data.board && data.board !== activeBoard) return;
                 if (seat !== 'all' && String(data.seatNumber) !== String(seat)) return;
 
@@ -1076,11 +1046,9 @@ const firebaseConfig = {
         const parts = cmd.split(' ');
         const action = parts[0];
 
-        // 📜 /log 指令
         if (action === '/log') {
             toggleLogWindow();
         } 
-        // ⚖️ /interrogate 指令：開啟或關閉審訊室
         else if (action === '/interrogate') {
             if (currentRole !== 'admin') {
                 return alert("權限不足！只有管理員可以控制審訊室。");
@@ -1115,7 +1083,6 @@ const firebaseConfig = {
                 alert("指令格式錯誤！請使用：/interrogate open 座號 或 /interrogate close");
             }
         }
-        // 👑 /admin 指令
         else if (action === '/admin') {
             if (currentRole !== 'admin') {
                 return alert("權限不足！只有管理員可操作 /admin。");
@@ -1155,7 +1122,6 @@ const firebaseConfig = {
                 alert("指令格式錯誤！請使用：/admin add 座號 或 /admin remove 座號");
             }
         } 
-        // 📌 /head 置頂指令
         else if (action === '/head') {
             if (currentRole !== 'admin') {
                 return alert("權限不足！只有管理員可將文章置頂。");
@@ -1181,11 +1147,9 @@ const firebaseConfig = {
                 alert("操作失敗：" + e.message);
             }
         } 
-        // 點數異動
         else if (action === '/point') {
             modifyPoints(parts[1], parts[2], parts.slice(3).join(' '));
         } 
-        // ✉️ 信箱指令
         else if (action === '/mail') {
             if (parts.length === 1) {
                 document.getElementById('mail-section').classList.toggle('hidden');
@@ -1196,7 +1160,6 @@ const firebaseConfig = {
                 sendMail(targetSeat, title, content);
             }
         } 
-        // 🗑️ 刪除文章指令
         else if (action === '/delete') {
             const targetId = parts[1];
             if (!targetId) return alert("格式錯誤！請輸入：/delete [文章編號]");
@@ -1210,8 +1173,7 @@ const firebaseConfig = {
                 }
 
                 const postData = docSnap.data();
-                const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-                const currentUserSeat = seatMatch ? String(seatMatch[1]) : null;
+                const currentUserSeat = getSeatFromUser(currentUser);
 
                 const isAuthor = (currentUserSeat && String(postData.seatNumber) === currentUserSeat);
                 const isAdmin = (currentRole === 'admin');
@@ -1229,16 +1191,13 @@ const firebaseConfig = {
                 alert("刪除失敗：" + error.message);
             }
         } 
-        // 🔒 私訊指令
         else if (action === '/msg') {
             const targetSeat = parts[1];
             const msgContent = parts.slice(2).join(' ').trim();
             if (!targetSeat || !msgContent) return alert("格式錯誤！/msg 座號 內容");
             
-            const seatMatch = currentUser && currentUser.email ? currentUser.email.match(/student_seat_([^@]+)@/);
-            const userSeat = seatMatch ? seatMatch[1] : "00";
+            const userSeat = getSeatFromUser(currentUser) || "00";
 
-            // 檢查私訊者是否被全域禁言
             try {
                 const userSnap = await getDoc(doc(db, "users", `seat_${userSeat}`));
                 if (userSnap.exists() && userSnap.data().bannedUntil && Date.now() < userSnap.data().bannedUntil) {
@@ -1267,13 +1226,11 @@ const firebaseConfig = {
                 alert("私訊傳送失敗：" + err.message);
             });
         } 
-        // 篩選聊天室
         else if (action === '/chat') {
             const targetSeat = parts[1];
             if (!targetSeat) alert("請輸入座號！/chat 座號 (或 /chat all)");
             else filterPostsBySeat(targetSeat);
         } 
-        // 🚫 全域禁言指令
         else if (action === '/ban') {
             if (currentRole !== 'admin') return alert("權限不足！只有管理員能禁言。");
             const targetSeat = parts[1];
