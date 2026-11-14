@@ -260,7 +260,7 @@
 
 <!-- 隱藏指令列 -->
 <div id="cmd-bar">
-    <input type="text" id="cmd-input" placeholder="指令例: /interrogate open 座號, /interrogate close, /admin add 座號, /head 文章編號, /log...">
+    <input type="text" id="cmd-input" placeholder="指令例: /log date May23, 2026, /ban 座號 分鐘, /interrogate open 座號, /admin add 座號...">
 </div>
 
 <script type="module">
@@ -269,7 +269,7 @@
     import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     // 🔴 請替換為專案的 Firebase 配置
-    const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyD9JNb4xzvlAQUJir-TSvIml29VC6TLVTU",
   authDomain: "class-6fbf4.firebaseapp.com",
   projectId: "class-6fbf4",
@@ -283,12 +283,14 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // 👑 程式碼內建硬編碼管理員清單
     const HARDCODED_ADMINS = ["502"];
 
     let currentUser = null;
     let currentRole = "student"; 
     let activeBoard = "all";
     let isLogOpen = false;
+    let logFilterDate = null;
     let currentStudentData = null;
     let interrogationState = { isOpen: false, targetSeat: null };
 
@@ -303,6 +305,27 @@
         admin: '🔒 管理員專屬',
         interrogate: '⚖️ 審訊室自白'
     };
+
+    // 🔒 檢查目前這台裝置（瀏覽器）是否處於禁言封鎖中
+    function checkDeviceBan() {
+        const deviceBanUntil = parseInt(localStorage.getItem('class52_device_ban') || '0');
+        if (deviceBanUntil && Date.now() < deviceBanUntil) {
+            const mins = Math.ceil((deviceBanUntil - Date.now()) / 60000);
+            alert(`🚫 此裝置因違規已被暫時封鎖！\n請等待約 ${mins} 分鐘後再操作。`);
+            return true;
+        } else if (deviceBanUntil) {
+            localStorage.removeItem('class52_device_ban');
+        }
+        return false;
+    }
+
+    // 📅 解析搜尋日期字串（支援 "May23, 2026"、"May 23, 2026"、"2026-05-23"、"2026/5/23"）
+    function parseSearchDate(dateStr) {
+        if (!dateStr) return null;
+        const normalized = dateStr.trim().replace(/^([a-zA-Z]+)(\d+)/, '$1 $2');
+        const parsed = new Date(normalized);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
 
     function formatEmail(seat) {
         return `student_seat_${seat}@class52.com`;
@@ -339,8 +362,10 @@
         }
     }
 
-    // 帳號註冊
+    // 帳號註冊（含裝置封鎖檢查 + 真實座號白名單驗證）
     document.getElementById('btn-register').addEventListener('click', async () => {
+        if (checkDeviceBan()) return;
+
         const seat = document.getElementById('seat-num').value.trim();
         const name = document.getElementById('real-name').value.trim();
         const pwd = document.getElementById('password').value;
@@ -348,6 +373,14 @@
 
         if (!seat || !name || !pwd) return alert("請填寫座號、姓名與密碼！");
         if (pwd !== confirmPwd) return alert("兩次輸入的密碼不一致！");
+
+        const seatNum = parseInt(seat);
+        const isValidStudentSeat = (!isNaN(seatNum) && seatNum >= 1 && seatNum <= 35 && String(seatNum) === seat);
+        const isSpecialAccount = (seat === "100" || seat === "502");
+
+        if (!isValidStudentSeat && !isSpecialAccount) {
+            return alert("註冊失敗！只能使用本班真實座號（1～35號）註冊，禁止創建假帳號！");
+        }
 
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, formatEmail(seat), pwd);
@@ -366,18 +399,25 @@
             alert("註冊成功！贈送 10 點班級金幣與 2 份寵物飼料！");
             logAction("帳號註冊", `座號: ${seat} | 姓名: ${name}`);
         } catch (error) {
-            alert("註冊失敗：" + error.message);
+            alert("註冊失敗（此座號可能已被註冊）：" + error.message);
         }
     });
 
-    // 登入
+    // 登入（含裝置封鎖檢查，管理員 502 可豁免解鎖）
     document.getElementById('btn-login').addEventListener('click', async () => {
         const seat = document.getElementById('seat-num').value.trim();
         const pwd = document.getElementById('password').value;
         if (!seat || !pwd) return alert("請輸入座號與密碼！");
 
+        if (!HARDCODED_ADMINS.includes(seat) && checkDeviceBan()) {
+            return;
+        }
+
         try {
             await signInWithEmailAndPassword(auth, formatEmail(seat), pwd);
+            if (HARDCODED_ADMINS.includes(seat)) {
+                localStorage.removeItem('class52_device_ban');
+            }
             alert("登入成功！");
             logAction("使用者登入", `座號: ${seat}`);
         } catch (error) {
@@ -416,6 +456,7 @@
 
             if (isAdmin) {
                 currentRole = 'admin';
+                localStorage.removeItem('class52_device_ban');
                 badge.innerText = '管理員';
                 badge.style.background = '#d93025';
                 document.getElementById('teacher-point-panel').classList.remove('hidden');
@@ -499,13 +540,23 @@
         }
     });
 
-    // 實時監聽使用者資料
+    // 實時監聽使用者資料（同步寫入瀏覽器裝置鎖）
     function listenToUserData(seat) {
         if (!seat) return;
         const userDocRef = doc(db, "users", `seat_${seat}`);
         onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 currentStudentData = docSnap.data();
+
+                // 🔒 若帳號處於禁言期間，同步寫入此台瀏覽器的裝置封鎖標記
+                if (currentStudentData.bannedUntil && Date.now() < currentStudentData.bannedUntil) {
+                    if (currentRole !== 'admin') {
+                        localStorage.setItem('class52_device_ban', String(currentStudentData.bannedUntil));
+                    }
+                } else {
+                    localStorage.removeItem('class52_device_ban');
+                }
+
                 document.getElementById('user-points').innerText = currentStudentData.points || 0;
                 document.getElementById('inv-food').innerText = currentStudentData.foodCount || 0;
                 
@@ -967,24 +1018,42 @@
         });
     }
 
-    // 全螢幕日誌
-    function toggleLogWindow() {
+    // 全螢幕日誌（支援 /log date 指定日期搜尋）
+    function toggleLogWindow(filterDate = null) {
         if (currentRole !== 'admin' && currentRole !== 'teacher') {
             return alert("權限不足！只有老師與管理員可以使用 /log 查看日誌。");
         }
 
         const logSection = document.getElementById('admin-log-section');
+        const logHeaderTitle = logSection.querySelector('h2');
+
+        if (filterDate) {
+            logFilterDate = filterDate;
+            logSection.classList.remove('hidden');
+            isLogOpen = true;
+            if (logHeaderTitle) {
+                logHeaderTitle.innerText = `📜 班級系統操作日誌 (篩選日期: ${filterDate.toLocaleDateString('zh-TW')})`;
+            }
+            loadLogs();
+            return;
+        }
+
         if (isLogOpen) {
             logSection.classList.add('hidden');
             isLogOpen = false;
+            logFilterDate = null;
         } else {
+            logFilterDate = null;
+            if (logHeaderTitle) {
+                logHeaderTitle.innerText = `📜 班級系統操作日誌 (Audit Logs)`;
+            }
             logSection.classList.remove('hidden');
             loadLogs();
             isLogOpen = true;
         }
     }
 
-    document.getElementById('btn-close-log').addEventListener('click', toggleLogWindow);
+    document.getElementById('btn-close-log').addEventListener('click', () => toggleLogWindow());
 
     function loadLogs() {
         const logsRef = collection(db, "logs");
@@ -1004,7 +1073,29 @@
                 return timeB - timeA;
             });
 
+            let startMs = null;
+            let endMs = null;
+            if (logFilterDate) {
+                const start = new Date(logFilterDate);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(logFilterDate);
+                end.setHours(23, 59, 59, 999);
+                startMs = start.getTime();
+                endMs = end.getTime();
+            }
+
+            let matchCount = 0;
+
             logsArray.forEach((data) => {
+                const logMs = data.timestamp
+                    ? (typeof data.timestamp.toMillis === 'function' ? data.timestamp.toMillis() : Number(data.timestamp))
+                    : 0;
+
+                if (startMs !== null && endMs !== null) {
+                    if (logMs < startMs || logMs > endMs) return;
+                }
+
+                matchCount++;
                 const timeStr = parseCustomTime(data.timestamp);
                 const logItem = document.createElement('div');
                 logItem.style.marginBottom = '6px';
@@ -1015,6 +1106,10 @@
                 logItem.innerHTML = `<span style="color: #888;">[${timeStr}]</span> <strong>${data.operatorSeat}(${data.operatorName})</strong> <span style="color: #ffc107;">[${data.action}]</span>: ${detailText}`;
                 logList.appendChild(logItem);
             });
+
+            if (matchCount === 0) {
+                logList.innerHTML = `<div style="color: #aaa; padding: 20px;">📭 找不到該時段的任何系統操作日誌。</div>`;
+            }
 
             logList.scrollTop = 0;
         });
@@ -1047,7 +1142,19 @@
         const action = parts[0];
 
         if (action === '/log') {
-            toggleLogWindow();
+            if (parts[1] === 'date') {
+                const rawDateStr = parts.slice(2).join(' ').trim();
+                if (!rawDateStr) {
+                    return alert("格式錯誤！請輸入日期，例如：\n/log date May23, 2026\n或 /log date 2026-05-23");
+                }
+                const targetDate = parseSearchDate(rawDateStr);
+                if (!targetDate) {
+                    return alert(`無法辨識日期格式【${rawDateStr}】！\n請使用如 May23, 2026 或 2026-05-23 的格式。`);
+                }
+                toggleLogWindow(targetDate);
+            } else {
+                toggleLogWindow();
+            }
         } 
         else if (action === '/interrogate') {
             if (currentRole !== 'admin') {
@@ -1251,7 +1358,7 @@
                     bannedUntil: banEndTime
                 });
 
-                alert(`已成功將【${targetSeat}】禁言 ${minutes} 分鐘（全域生效）！`);
+                alert(`已成功將【${targetSeat}】禁言 ${minutes} 分鐘（全域生效並鎖定裝置）！`);
                 logAction("執行禁言", `目標: ${targetSeat} | 禁言時長: ${minutes} 分鐘 | 解禁時間: ${new Date(banEndTime).toLocaleString('zh-TW')}`);
             } catch (error) {
                 alert("禁言設定失敗：" + error.message);
